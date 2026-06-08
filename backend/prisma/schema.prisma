@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Empresa {
+  id        Int    @id @default(autoincrement())
+  nome      String
+  email     String @unique
+  senhaHash String
+  telefone  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ativo        Boolean                @default(true)
+  servicos     Servico[]
+  horarios     HorarioFuncionamento[]
+  agendamentos Agendamento[]
+  assinatura Assinatura?
+}
+
+model Servico {
+  id             Int     @id @default(autoincrement())
+  empresaId      Int
+  nome           String
+  duracaoMinutos Int
+  descricao      String?
+  preco Decimal @db.Decimal(10,2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ativo Boolean @default(true)
+
+  empresa      Empresa       @relation(fields: [empresaId], references: [id])
+  agendamentos Agendamento[]
+}
+
+model HorarioFuncionamento {
+  id         Int     @id @default(autoincrement())
+  empresaId  Int
+  diaSemana  Int
+  horaInicio String
+  horaFim    String
+  ativo      Boolean @default(true)
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+}
+
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String?
+  telefone  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agendamentos Agendamento[]
+}
+
+model Agendamento {
+  id             Int      @id @default(autoincrement())
+  empresaId      Int
+  servicoId      Int
+  clienteId      Int
+  status         String   @default("AGENDADO")
+  datahoraInicio DateTime
+  datahoraFim    DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+  servico Servico @relation(fields: [servicoId], references: [id])
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+}
+model Assinatura {
+  id Int @id @default(autoincrement())
+
+  empresaId Int @unique
+
+  plano String
+
+  ativa Boolean @default(true)
+
+  vencimento DateTime
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+}
