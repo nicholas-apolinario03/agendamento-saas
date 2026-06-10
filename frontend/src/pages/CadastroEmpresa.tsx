@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-
+import {api} from "../services/api"
 
 export function CadastroEmpresa(){
 
@@ -8,14 +8,26 @@ export function CadastroEmpresa(){
     const [senha, setSenha] = useState<string>("")
     const [telefone ,setTelefone] =useState<string>("")
 
-    function cadastrarEmpresa (event: React.SyntheticEvent<HTMLFormElement>) {
+    const cadastrarEmpresa = async (event: React.SyntheticEvent<HTMLFormElement>) => {
         event.preventDefault();
-        console.log({
-            nome,
-            email,
-            telefone,
-            senha
-        }); 
+        try{
+            const resposta = await api.post(
+                "empresa/cadastro",
+                {
+                    nome,
+                    email,
+                    senha,
+                    telefone,
+                }
+                
+            );
+            console.log("empresa criada")
+            console.log(resposta.data);
+        }catch(erro){
+            console.error("erro ao cadastrar");
+            console.error(erro);
+        }
+       
 
     }
     return(
