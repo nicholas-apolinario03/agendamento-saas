@@ -7,6 +7,7 @@ export function CadastroEmpresa(){
     const [email, setEmail] = useState<string>("")
     const [senha, setSenha] = useState<string>("")
     const [telefone ,setTelefone] =useState<string>("")
+    const [mensagem, setMensagem] = useState<string>("")
 
     const cadastrarEmpresa = async (event: React.SyntheticEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -19,13 +20,13 @@ export function CadastroEmpresa(){
                     senha,
                     telefone,
                 }
-                
+               
             );
-            console.log("empresa criada")
-            console.log(resposta.data);
+             setMensagem("cadastro concluido com sucesso")
         }catch(erro){
             console.error("erro ao cadastrar");
             console.error(erro);
+            setMensagem("erro ao cadastrar")
         }
        
 
@@ -36,7 +37,8 @@ export function CadastroEmpresa(){
             <input type="email" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)}/>
             <input type="password" placeholder="Senha" value={senha} onChange={(e)=>setSenha(e.target.value)}/>
             <input type="text" placeholder="Telefone/Whatsapp" value={telefone} onChange={(e)=>setTelefone(e.target.value)}/>
-            <button type="submit"></button>
+            <button type="submit">Cadastrar</button>
+            {mensagem && <p>{mensagem}</p>}
         </form>
     )
 }
