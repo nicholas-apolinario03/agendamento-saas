@@ -5,19 +5,23 @@ type EnviarMensagemWhatsAppParams = {
 
 type RespostaEnvioWhatsApp = {
     messaging_product?: string;
+
     contacts?: Array<{
         input: string;
         wa_id: string;
     }>;
+
     messages?: Array<{
         id: string;
     }>;
+
     error?: {
         message?: string;
         type?: string;
         code?: number;
         error_subcode?: number;
         fbtrace_id?: string;
+
         error_data?: {
             messaging_product?: string;
             details?: string;
@@ -42,6 +46,38 @@ export async function enviarMensagemWhatsApp({
     const phoneNumberId =
         process.env.WHATSAPP_PHONE_NUMBER_ID;
 
+    const versaoGraph =
+        process.env.META_GRAPH_API_VERSION ??
+        "v24.0";
+
+    console.log(
+        "CONFIGURAÇÃO DO ENVIO:",
+        {
+            telefoneRecebido:
+                telefone,
+
+            phoneNumberId,
+
+            tokenExiste:
+                Boolean(token),
+
+            /*
+             * Mostra somente o início para confirmar
+             * se a variável foi carregada.
+             *
+             * Nunca mostre o token completo.
+             */
+            inicioToken:
+                token?.slice(0, 6),
+
+            modoTeste:
+                process.env
+                    .WHATSAPP_MODO_TESTE,
+
+            versaoGraph,
+        }
+    );
+
     if (!token) {
         throw new Error(
             "WHATSAPP_TOKEN não foi configurado"
@@ -55,7 +91,9 @@ export async function enviarMensagemWhatsApp({
     }
 
     const telefoneNormalizado =
-        normalizarTelefone(telefone);
+        normalizarTelefone(
+            telefone
+        );
 
     if (!telefoneNormalizado) {
         throw new Error(
@@ -63,58 +101,136 @@ export async function enviarMensagemWhatsApp({
         );
     }
 
-    const versaoGraph =
-        process.env.META_GRAPH_API_VERSION ??
-        "v24.0";
+    if (!mensagem.trim()) {
+        throw new Error(
+            "A mensagem não pode estar vazia"
+        );
+    }
 
     const url =
         `https://graph.facebook.com/` +
         `${versaoGraph}/` +
         `${phoneNumberId}/messages`;
 
-    const resposta =
-        await fetch(url, {
-            method: "POST",
+    const corpoRequisicao = {
+        messaging_product:
+            "whatsapp",
 
-            headers: {
-                Authorization:
-                    `Bearer ${token}`,
+        recipient_type:
+            "individual",
 
-                "Content-Type":
-                    "application/json",
-            },
+        to:
+            telefoneNormalizado,
 
-            body: JSON.stringify({
-                messaging_product:
-                    "whatsapp",
+        type:
+            "text",
 
-                recipient_type:
-                    "individual",
+        text: {
+            preview_url:
+                false,
 
-                to:
-                    telefoneNormalizado,
+            body:
+                mensagem,
+        },
+    };
 
-                type:
-                    "text",
+    console.log(
+        "TENTANDO ENVIAR RESPOSTA:",
+        {
+            url,
+            telefone:
+                telefoneNormalizado,
+            mensagem,
+        }
+    );
 
-                text: {
-                    preview_url:
-                        false,
+    let resposta: Response;
+
+    try {
+        resposta =
+            await fetch(
+                url,
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+
+                        "Content-Type":
+                            "application/json",
+                    },
 
                     body:
-                        mensagem,
-                },
-            }),
-        });
+                        JSON.stringify(
+                            corpoRequisicao
+                        ),
+                }
+            );
 
-    const dados =
-        await resposta.json() as
-            RespostaEnvioWhatsApp;
+    } catch (erro) {
+
+        console.error(
+            "ERRO DE CONEXÃO COM A META:",
+            erro
+        );
+
+        throw new Error(
+            erro instanceof Error
+                ? `Falha ao acessar a API da Meta: ${erro.message}`
+                : "Falha ao acessar a API da Meta"
+        );
+    }
+
+    let dados:
+        RespostaEnvioWhatsApp;
+
+    try {
+        dados =
+            await resposta.json() as
+                RespostaEnvioWhatsApp;
+
+    } catch (erro) {
+
+        console.error(
+            "A META RETORNOU UMA RESPOSTA INVÁLIDA:",
+            {
+                status:
+                    resposta.status,
+
+                statusText:
+                    resposta.statusText,
+
+                erro,
+            }
+        );
+
+        throw new Error(
+            `Resposta inválida da Meta. Status ${resposta.status}`
+        );
+    }
+
+    console.log(
+        "RESPOSTA DA META:",
+        {
+            status:
+                resposta.status,
+
+            statusText:
+                resposta.statusText,
+
+            ok:
+                resposta.ok,
+
+            dados,
+        }
+    );
 
     if (!resposta.ok) {
 
         console.error(
-            "Erro retornado pela Meta:",
+            "ERRO RETORNADO PELA META:",
             JSON.stringify(
                 dados,
                 null,
@@ -122,39 +238,58 @@ export async function enviarMensagemWhatsApp({
             )
         );
 
-        const detalhes =
-            dados.error?.error_data
-                ?.details;
-
         const mensagemErro =
             dados.error?.message ??
-            detalhes ??
+            dados.error?.error_data
+                ?.details ??
             "Erro desconhecido da Meta";
 
         const codigo =
             dados.error?.code;
 
-        throw new Error(
+        const subcodigo =
+            dados.error
+                ?.error_subcode;
+
+        const partesErro = [
             codigo
-                ? `Erro ${codigo}: ${mensagemErro}`
-                : mensagemErro
+                ? `Erro ${codigo}`
+                : null,
+
+            subcodigo
+                ? `subcódigo ${subcodigo}`
+                : null,
+
+            mensagemErro,
+        ].filter(Boolean);
+
+        throw new Error(
+            partesErro.join(": ")
         );
     }
 
     const mensagemId =
         dados.messages?.[0]?.id;
 
-    console.log(
-        "Mensagem enviada pela API do WhatsApp:",
-        {
-            telefone:
-                telefoneNormalizado,
+    if (!mensagemId) {
 
-            mensagemId:
-                mensagemId ??
-                "não informado",
-        }
-    );
+        console.warn(
+            "A Meta aceitou a requisição, mas não retornou o ID da mensagem:",
+            dados
+        );
+
+    } else {
+
+        console.log(
+            "Mensagem enviada pela API do WhatsApp:",
+            {
+                telefone:
+                    telefoneNormalizado,
+
+                mensagemId,
+            }
+        );
+    }
 
     return {
         mensagemId,
