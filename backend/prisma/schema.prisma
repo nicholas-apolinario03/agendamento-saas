@@ -22,6 +22,9 @@ model Empresa {
   horarios     HorarioFuncionamento[]
   agendamentos Agendamento[]
   assinatura Assinatura?
+
+  sessoesWhatsApp SessaoWhatsApp[]
+  clientes Cliente[]
 }
 
 model Servico {
@@ -54,20 +57,24 @@ model HorarioFuncionamento {
 
 model Cliente {
   id        Int      @id @default(autoincrement())
+  empresaId  Int
   nome      String
   email     String?
   telefone  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([empresaId, telefone])
+  empresa Empresa @relation(fields: [empresaId], references: [id])
   agendamentos Agendamento[]
+  
 }
 
 model Agendamento {
   id             Int      @id @default(autoincrement())
   empresaId      Int
   servicoId      Int
-  clienteId      Int
+  clienteId      Int?
   status         String   @default("AGENDADO")
   datahoraInicio DateTime
   datahoraFim    DateTime
@@ -77,7 +84,7 @@ model Agendamento {
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
   servico Servico @relation(fields: [servicoId], references: [id])
-  cliente Cliente @relation(fields: [clienteId], references: [id])
+  cliente Cliente? @relation(fields: [clienteId], references: [id])
 }
 model Assinatura {
   id Int @id @default(autoincrement())
@@ -91,4 +98,21 @@ model Assinatura {
   vencimento DateTime
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
+}
+model SessaoWhatsApp {
+    id               Int      @id @default(autoincrement())
+    empresaId        Int
+    telefone         String
+    etapa            String
+
+    servicoId        Int?
+    dataEscolhida    DateTime?
+    datahoraInicio   DateTime?
+
+    atualizadoEm     DateTime @updatedAt
+    criadoEm         DateTime @default(now())
+
+    empresa Empresa  @relation(fields: [empresaId],references: [id],onDelete: Cascade)
+
+    @@unique([empresaId, telefone])
 }

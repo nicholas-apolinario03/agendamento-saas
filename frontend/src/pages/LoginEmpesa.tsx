@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { api } from "../services/api"
+import { useNavigate } from "react-router-dom";
 
 
 export function LoginEmpresas() {
 
+    const navigate = useNavigate();
     const [email, setEmail] = useState<string>("");
     const [senha, setSenha] = useState<string>("");
     const [mensagem, setMensagem] = useState<string>("")
@@ -28,6 +30,7 @@ export function LoginEmpresas() {
             );
             
             setMensagem("Login concluido com sucesso")
+            navigate("/dashboard")
         } catch (erro) {
             console.error("erro ao cadastrar");
             console.error(erro);

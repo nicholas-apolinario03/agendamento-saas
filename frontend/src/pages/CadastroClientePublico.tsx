@@ -1,25 +1,30 @@
 import React, { useState } from "react";
 import {api} from "../services/api"
 
-export function CadastroEmpresa(){
+export function CadastroClientePublico(){
 
     const [nome, setNome] = useState<string>("")
     const [email, setEmail] = useState<string>("")
-    const [senha, setSenha] = useState<string>("")
     const [telefone ,setTelefone] =useState<string>("")
     const [mensagem, setMensagem] = useState<string>("")
 
-    const cadastrarEmpresa = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    const cadastrarClientePublico = async (event: React.SyntheticEvent<HTMLFormElement>) => {
         event.preventDefault();
         try{
+             const token = localStorage.getItem("token");
+
            await api.post(
-                "empresa/cadastro",
+                "empresa/clientes",
                 {
                     nome,
-                    email,
-                    senha,
+                    email: email || null,
                     telefone,
-                }
+                },
+                {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
                
             );
              setMensagem("cadastro concluido com sucesso")
@@ -32,11 +37,10 @@ export function CadastroEmpresa(){
 
     }
     return(
-        <form onSubmit={cadastrarEmpresa}>
+        <form onSubmit={cadastrarClientePublico}>
             <input type="text" placeholder="Nome" value={nome} onChange={(e)=>setNome(e.target.value)}/>
-            <input type="email" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)}/>
-            <input type="password" placeholder="Senha" value={senha} onChange={(e)=>setSenha(e.target.value)}/>
             <input type="text" placeholder="Telefone/Whatsapp" value={telefone} onChange={(e)=>setTelefone(e.target.value)}/>
+            <input type="email" placeholder="Email (Opcional)" value={email} onChange={(e)=>setEmail(e.target.value)}/>
             <button type="submit">Cadastrar</button>
             {mensagem && <p>{mensagem}</p>}
         </form>
