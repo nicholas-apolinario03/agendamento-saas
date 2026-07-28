@@ -5,7 +5,24 @@ const whatsappRoutes = Router();
 
 whatsappRoutes.get(
     "/webhook/whatsapp",
-    (req, res) => {
+     async (req, res) => {
+        console.log("WEBHOOK REAL RECEBIDO", {
+            horario: new Date().toISOString(),
+            phoneNumberIdRecebido:
+                req.body.entry?.[0]
+                    ?.changes?.[0]
+                    ?.value?.metadata
+                    ?.phone_number_id,
+            telefone:
+                req.body.entry?.[0]
+                    ?.changes?.[0]
+                    ?.value?.messages?.[0]?.from,
+            texto:
+                req.body.entry?.[0]
+                    ?.changes?.[0]
+                    ?.value?.messages?.[0]
+                    ?.text?.body,
+        });
         const modo =
             req.query["hub.mode"];
 
