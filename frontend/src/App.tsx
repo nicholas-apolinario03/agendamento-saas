@@ -8,11 +8,17 @@ import { ProtecaoRota } from "./components/ProtecaoRota";
 import { PublicRoute } from "./components/PublicRoute";
 import { CadastroClienteEmpresa } from "./pages/CadastroClienteEmpresa";
 import { DashboardAgendamento } from "./pages/DashboardAgendamento";
+import { PoliticaPrivacidade } from "./components/PoliticaPrivacidade";
+
 
 
 function App() {
   return (
     <Routes>
+      <Route
+    path="/politica-de-privacidade"
+    element={<PoliticaPrivacidade />}
+/>
       <Route path="/dashboard"
         element={
           <ProtecaoRota>
