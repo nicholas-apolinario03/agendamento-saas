@@ -1,5 +1,6 @@
 import { Router } from "express";
-
+import { processarMensagemWhatsApp } from
+    "../service/processarMensagemWhatsApp";
 const whatsappRoutes = Router();
 
 whatsappRoutes.get(
@@ -41,13 +42,13 @@ whatsappRoutes.get(
 whatsappRoutes.post(
     "/webhook/whatsapp",
     async (req, res) => {
+
+        /*
+         * Primeiro respondemos 200 para a Meta.
+         */
+        res.sendStatus(200);
+
         try {
-            /*
-             * Respondemos imediatamente para a Meta.
-             * Isso evita que ela tente enviar o mesmo
-             * evento várias vezes.
-             */
-            res.sendStatus(200);
 
             const valor =
                 req.body.entry?.[0]
@@ -58,12 +59,13 @@ whatsappRoutes.post(
                 valor?.messages?.[0];
 
             /*
-             * Alguns eventos são apenas atualizações
-             * de status, como sent, delivered ou failed.
+             * Pode ser evento de status, como failed,
+             * delivered ou sent.
              */
             if (!mensagem) {
+
                 console.log(
-                    "Evento recebido sem mensagem"
+                    "Evento recebido sem mensagem:"
                 );
 
                 console.log(
@@ -73,37 +75,66 @@ whatsappRoutes.post(
                 return;
             }
 
+            if (mensagem.type !== "text") {
+
+                console.log(
+                    `Tipo de mensagem não suportado: ${mensagem.type}`
+                );
+
+                return;
+            }
+
             const telefone =
                 mensagem.from;
-
-            const tipoMensagem =
-                mensagem.type;
 
             const texto =
                 mensagem.text?.body?.trim();
 
-            const nomePerfil =
-                valor.contacts?.[0]
-                    ?.profile?.name;
+            const empresaId =
+                Number(
+                    process.env.WHATSAPP_EMPRESA_ID
+                );
 
-            console.log("\n============================");
+            if (
+                !empresaId ||
+                !telefone ||
+                !texto
+            ) {
 
-            console.log("Mensagem recebida");
+                console.log(
+                    "Dados obrigatórios ausentes:",
+                    {
+                        empresaId,
+                        telefone,
+                        texto,
+                    }
+                );
 
+                return;
+            }
+
+            console.log("\n==============================");
+            console.log("Mensagem recebida:");
             console.log({
+                empresaId,
                 telefone,
-                nomePerfil,
-                tipoMensagem,
-                texto
+                texto,
+            });
+            console.log("==============================\n");
+
+            await processarMensagemWhatsApp({
+                empresaId,
+                telefone,
+                texto,
             });
 
-            console.log("============================\n");
-
         } catch (erro) {
+
             console.error(
-                "Erro ao processar webhook:",
+                "Erro ao processar mensagem do WhatsApp:",
                 erro
             );
+
         }
     }
 );

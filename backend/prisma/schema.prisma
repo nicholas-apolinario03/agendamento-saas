@@ -38,10 +38,15 @@ model Servico {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tipoDisponibilidade String @default("TODOS_OS_DIAS")
+
   ativo Boolean @default(true)
 
   empresa      Empresa       @relation(fields: [empresaId], references: [id])
   agendamentos Agendamento[]
+    disponibilidadesSemanais DisponibilidadeSemanalServico[]
+
+    excecoesDisponibilidade ExcecaoDisponibilidadeServico[]
 }
 
 model HorarioFuncionamento {
@@ -115,4 +120,25 @@ model SessaoWhatsApp {
     empresa Empresa  @relation(fields: [empresaId],references: [id],onDelete: Cascade)
 
     @@unique([empresaId, telefone])
+}
+model DisponibilidadeSemanalServico {
+    id         Int     @id @default(autoincrement())
+    servicoId  Int
+    diaSemana  Int
+    ativo      Boolean @default(true)
+
+    servico Servico @relation( fields: [servicoId],references: [id], onDelete: Cascade )
+
+    @@unique([servicoId, diaSemana])
+}
+
+model ExcecaoDisponibilidadeServico {
+    id          Int      @id @default(autoincrement())
+    servicoId   Int
+    data        DateTime
+    disponivel  Boolean
+
+    servico Servico @relation( fields: [servicoId],references: [id],onDelete: Cascade )
+
+    @@unique([servicoId, data])
 }

@@ -32,8 +32,26 @@ export function ListarAgendamentos({
     }
 
     function formatarData(data: string) {
-
         return new Date(data).toLocaleString("pt-BR");
+    }
+
+    function formatarStatus(status: string) {
+        switch (status) {
+            case "AGUARDANDO_CONFIRMACAO":
+                return "Aguardando confirmação";
+
+            case "AGENDADO":
+                return "Agendado";
+
+            case "CANCELADO":
+                return "Cancelado";
+
+            case "CONCLUIDO":
+                return "Concluído";
+
+            default:
+                return status;
+        }
     }
 
     return (
@@ -52,21 +70,35 @@ export function ListarAgendamentos({
                 agendamentos.map((agendamento) => {
 
                     const cliente =
-                        encontrarCliente(agendamento.clienteId);
+                        encontrarCliente(
+                            agendamento.clienteId
+                        );
 
                     const servico =
-                        encontrarServico(agendamento.servicoId);
+                        encontrarServico(
+                            agendamento.servicoId
+                        );
+
+                    const podeEditar =
+                        agendamento.status === "AGENDADO";
+
+                    const podeCancelar =
+                        agendamento.status === "AGENDADO" ||
+                        agendamento.status ===
+                            "AGUARDANDO_CONFIRMACAO";
 
                     return (
                         <div key={agendamento.id}>
 
                             <h3>
-                                {cliente?.nome ?? "Cliente não encontrado"}
+                                {cliente?.nome ??
+                                    "Cliente não encontrado"}
                             </h3>
 
                             <p>
                                 Serviço:{" "}
-                                {servico?.nome ?? "Serviço não encontrado"}
+                                {servico?.nome ??
+                                    "Serviço não encontrado"}
                             </p>
 
                             <p>
@@ -84,24 +116,35 @@ export function ListarAgendamentos({
                             </p>
 
                             <p>
-                                Status: {agendamento.status}
+                                Status:{" "}
+                                {formatarStatus(
+                                    agendamento.status
+                                )}
                             </p>
 
-                            <button
-                                onClick={() =>
-                                    aoEditar(agendamento)
-                                }
-                            >
-                                Editar
-                            </button>
+                            {podeEditar && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        aoEditar(agendamento)
+                                    }
+                                >
+                                    Editar horário
+                                </button>
+                            )}
 
-                            <button
-                                onClick={() =>
-                                    aoCancelar(agendamento.id)
-                                }
-                            >
-                                Excluir
-                            </button>
+                            {podeCancelar && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        aoCancelar(
+                                            agendamento.id
+                                        )
+                                    }
+                                >
+                                    Cancelar
+                                </button>
+                            )}
 
                         </div>
                     );

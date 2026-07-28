@@ -1,134 +1,235 @@
 import { useEffect, useState } from "react";
+
 import { api } from "../services/api";
+
 import { ListaServicos } from "../components/ListarServicos";
-import type { NovoServico, Servico } from "../types/Servico";
 import { FormularioServico } from "../components/FormularioServico";
+
+import type {
+    NovoServico,
+    Servico
+} from "../types/Servico";
 
 
 export function DashboardEmpresa() {
 
-    const [servicos, setServicos] = useState<Servico[]>([]);
-    const [mensagem, setMensagem] = useState<string>("")
-    const [servicoEditando, setServicoEditando] =
-        useState<Servico | null>(null);
+    const [servicos, setServicos] =
+        useState<Servico[]>([]);
+
+    const [mensagem, setMensagem] =
+        useState("");
+
+    const [
+        servicoEditando,
+        setServicoEditando
+    ] = useState<Servico | null>(null);
 
 
     async function buscarServicos() {
 
+        const token =
+            localStorage.getItem("token");
+
         try {
-            const token = localStorage.getItem("token");
-            const resposta = await api.get("empresa/servicos",
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
+
+            const resposta =
+                await api.get(
+                    "empresa/servicos",
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`
+                        }
                     }
-                })
+                );
 
             setServicos(resposta.data);
+
         } catch (erro) {
-            console.error(erro);
+
+            console.error(
+                "Erro ao buscar serviços:",
+                erro
+            );
+
+            setMensagem(
+                "Erro ao buscar serviços"
+            );
+
         }
 
     }
+
+
     useEffect(() => {
         buscarServicos();
-    }, [])
+    }, []);
 
-    async function excluirServico(id: number) {
 
-        const token = localStorage.getItem("token");
-        await api.delete(`empresa/servicos/${id}`, {
-            headers: {
-                Authorization: `Bearer ${token}`
+    async function excluirServico(
+        id: number
+    ) {
+
+        const token =
+            localStorage.getItem("token");
+
+        try {
+
+            await api.delete(
+                `empresa/servicos/${id}`,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`
+                    }
+                }
+            );
+
+            if (
+                servicoEditando?.id === id
+            ) {
+                setServicoEditando(null);
             }
-        });
-        buscarServicos();
+
+            setMensagem(
+                "Serviço excluído com sucesso"
+            );
+
+            await buscarServicos();
+
+        } catch (erro: any) {
+
+            console.error(
+                "Erro ao excluir serviço:",
+                erro
+            );
+
+            setMensagem(
+                erro.response?.data?.erro ??
+                "Erro ao excluir serviço"
+            );
+
+        }
 
     }
 
-    function editarServico(servico: Servico) {
+
+    function editarServico(
+        servico: Servico
+    ) {
 
         setServicoEditando(servico);
+        setMensagem("");
 
     }
-    async function salvarServico(dados: NovoServico) {
 
-        const token = localStorage.getItem("token");
 
-        if (servicoEditando) {
+    function cancelarEdicao() {
 
-            try {
+        setServicoEditando(null);
+        setMensagem("");
 
-                await api.put(`empresa/servicos/${servicoEditando.id}`,
+    }
+
+
+    async function salvarServico(
+        dados: NovoServico
+    ) {
+
+        const token =
+            localStorage.getItem("token");
+
+        try {
+
+            if (servicoEditando) {
+
+                await api.put(
+                    `empresa/servicos/${servicoEditando.id}`,
                     dados,
                     {
                         headers: {
-                            Authorization: `Bearer ${token}`
+                            Authorization:
+                                `Bearer ${token}`
                         }
                     }
+                );
 
-                )
+                setMensagem(
+                    "Serviço atualizado com sucesso"
+                );
 
+            } else {
 
-                setMensagem("Serviço atualizado com sucesso");
-
-                await buscarServicos();
-                setServicoEditando(null);
-
-            } catch (erro) {
-                console.error("erro ao editar");
-                console.error(erro);
-                setMensagem("erro ao editar")
-            }
-
-        } else {
-
-            try {
                 await api.post(
                     "empresa/servicos",
                     dados,
                     {
                         headers: {
-                            Authorization: `Bearer ${token}`
+                            Authorization:
+                                `Bearer ${token}`
                         }
                     }
                 );
 
-                setMensagem("cadastro concluido com sucesso")
+                setMensagem(
+                    "Serviço cadastrado com sucesso"
+                );
 
-                await buscarServicos();
-                setServicoEditando(null);
-
-            } catch (erro) {
-                console.error("erro ao cadastrar");
-                console.error(erro);
-                setMensagem("erro ao cadastrar")
             }
 
+            setServicoEditando(null);
 
+            await buscarServicos();
+
+        } catch (erro: any) {
+
+            console.error(
+                "Erro ao salvar serviço:",
+                erro
+            );
+
+            setMensagem(
+                erro.response?.data?.erro ??
+                "Erro ao salvar serviço"
+            );
 
         }
 
-
-
     }
+
 
     return (
         <div>
+
             <FormularioServico
                 servico={servicoEditando}
                 onSalvar={salvarServico}
             />
 
+
+            {servicoEditando && (
+                <button
+                    type="button"
+                    onClick={cancelarEdicao}
+                >
+                    Cancelar edição
+                </button>
+            )}
+
+
             <ListaServicos
-
                 servicos={servicos}
-
                 aoExcluir={excluirServico}
                 aoEditar={editarServico}
-
             />
-            {mensagem && <p>{mensagem}</p>}
+
+
+            {mensagem && (
+                <p>
+                    {mensagem}
+                </p>
+            )}
+
         </div>
-    )
+    );
 }

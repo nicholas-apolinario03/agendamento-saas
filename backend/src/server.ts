@@ -9,8 +9,6 @@ app.listen(PORT, ()=> {
 import "dotenv/config";
 import app from "./app";
 
-console.log("TIPO DO APP:", typeof app);
-console.log("APP:", app);
 
 const PORT = 3000;
 
