@@ -15,12 +15,6 @@ app.use(express.json());
 
 app.use(whatsappRoutes);
 
-export default app;
-
-/*
-const app = express();
-app.use(cors());
-app.use(express.json());
 
 app.get("/teste", (req, res) => {
     res.json({
@@ -1287,7 +1281,7 @@ app.put(
         }
     }
 );
-*/
+
 import {
     enviarMensagemWhatsApp
 } from "./service/enviarMensagemWhatsApp";
