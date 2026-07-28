@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import { gerartoken } from "./service/jwt";
 import { auth } from "./middleware/auth";
 
-import whatsappRoutes from "./routes/WhatsappRouteS";
+import whatsappRoutes from "./routes/WhatsappRoutes";
 
 const app = express();
 
