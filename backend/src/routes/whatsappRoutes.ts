@@ -1,28 +1,16 @@
 import { Router } from "express";
-import { processarMensagemWhatsApp } from
-    "../service/processarMensagemWhatsApp";
+
+import {
+    processarMensagemWhatsApp
+} from "../service/processarMensagemWhatsApp";
+
 const whatsappRoutes = Router();
+
 
 whatsappRoutes.get(
     "/webhook/whatsapp",
-     async (req, res) => {
-        console.log("WEBHOOK REAL RECEBIDO", {
-            horario: new Date().toISOString(),
-            phoneNumberIdRecebido:
-                req.body.entry?.[0]
-                    ?.changes?.[0]
-                    ?.value?.metadata
-                    ?.phone_number_id,
-            telefone:
-                req.body.entry?.[0]
-                    ?.changes?.[0]
-                    ?.value?.messages?.[0]?.from,
-            texto:
-                req.body.entry?.[0]
-                    ?.changes?.[0]
-                    ?.value?.messages?.[0]
-                    ?.text?.body,
-        });
+    (req, res) => {
+
         const modo =
             req.query["hub.mode"];
 
@@ -56,16 +44,28 @@ whatsappRoutes.get(
     }
 );
 
+
 whatsappRoutes.post(
     "/webhook/whatsapp",
     async (req, res) => {
 
-        /*
-         * Primeiro respondemos 200 para a Meta.
-         */
-        res.sendStatus(200);
-
         try {
+
+            console.log(
+                "WEBHOOK REAL RECEBIDO",
+                {
+                    horario:
+                        new Date().toISOString(),
+
+                    phoneNumberIdRecebido:
+                        req.body.entry?.[0]
+                            ?.changes?.[0]
+                            ?.value
+                            ?.metadata
+                            ?.phone_number_id,
+                }
+            );
+
 
             const valor =
                 req.body.entry?.[0]
@@ -75,48 +75,63 @@ whatsappRoutes.post(
             const mensagem =
                 valor?.messages?.[0];
 
+
             /*
-             * Pode ser evento de status, como failed,
-             * delivered ou sent.
+             * A Meta também envia webhooks de status:
+             * sent, delivered, read e failed.
              */
             if (!mensagem) {
 
                 console.log(
-                    "Evento recebido sem mensagem:"
+                    "Evento recebido sem mensagem de usuário:",
+                    JSON.stringify(
+                        req.body,
+                        null,
+                        2
+                    )
                 );
 
-                console.log(
-                    JSON.stringify(req.body, null, 2)
-                );
-
-                return;
+                return res.sendStatus(200);
             }
 
-            if (mensagem.type !== "text") {
+
+            if (
+                mensagem.type !== "text" ||
+                !mensagem.text?.body
+            ) {
 
                 console.log(
                     `Tipo de mensagem não suportado: ${mensagem.type}`
                 );
 
-                return;
+                return res.sendStatus(200);
             }
+
 
             const telefone =
                 mensagem.from;
 
             const texto =
-                mensagem.text?.body?.trim();
+                mensagem.text.body.trim();
 
             const empresaId =
                 Number(
-                    process.env.WHATSAPP_EMPRESA_ID
+                    process.env
+                        .WHATSAPP_EMPRESA_ID
                 );
+
 
             if (
                 !empresaId ||
-                !telefone ||
-                !texto
+                Number.isNaN(empresaId)
             ) {
+                throw new Error(
+                    "WHATSAPP_EMPRESA_ID inválido ou não configurado"
+                );
+            }
+
+
+            if (!telefone || !texto) {
 
                 console.log(
                     "Dados obrigatórios ausentes:",
@@ -127,23 +142,42 @@ whatsappRoutes.post(
                     }
                 );
 
-                return;
+                return res.sendStatus(200);
             }
 
-            console.log("\n==============================");
-            console.log("Mensagem recebida:");
-            console.log({
-                empresaId,
-                telefone,
-                texto,
-            });
-            console.log("==============================\n");
 
+            console.log(
+                "Mensagem recebida:",
+                {
+                    empresaId,
+                    telefone,
+                    texto,
+                }
+            );
+
+
+            console.log(
+                "ANTES DE PROCESSAR A MENSAGEM"
+            );
+
+
+            /*
+             * Na Vercel precisamos aguardar todo o
+             * processamento antes de responder à Meta.
+             */
             await processarMensagemWhatsApp({
                 empresaId,
                 telefone,
                 texto,
             });
+
+
+            console.log(
+                "DEPOIS DE PROCESSAR A MENSAGEM"
+            );
+
+
+            return res.sendStatus(200);
 
         } catch (erro) {
 
@@ -152,8 +186,15 @@ whatsappRoutes.post(
                 erro
             );
 
+            /*
+             * Respondemos 200 para evitar que a Meta
+             * repita várias vezes a mesma mensagem
+             * durante os testes.
+             */
+            return res.sendStatus(200);
         }
     }
 );
+
 
 export default whatsappRoutes;
