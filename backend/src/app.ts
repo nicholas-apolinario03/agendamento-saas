@@ -7,6 +7,7 @@ import { gerartoken } from "./service/jwt";
 import { auth } from "./middleware/auth";
 
 import whatsappRoutes from "./routes/whatsappRoutes";
+import integracaoWhatsAppRoutes from "./routes/integracaoWhatsAppRoutes";
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use(whatsappRoutes);
+app.use(integracaoWhatsAppRoutes);
 
 
 app.get("/teste", (req, res) => {
