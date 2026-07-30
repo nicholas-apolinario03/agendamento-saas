@@ -4,6 +4,7 @@ import { api } from "../services/api";
 
 import { ListaServicos } from "../components/ListarServicos";
 import { FormularioServico } from "../components/FormularioServico";
+import IntegracaoWhatsApp from "../components/IntegracaoWhatsApp";
 
 import type {
     NovoServico,
@@ -200,7 +201,7 @@ export function DashboardEmpresa() {
 
     return (
         <div>
-
+            <IntegracaoWhatsApp />
             <FormularioServico
                 servico={servicoEditando}
                 onSalvar={salvarServico}
