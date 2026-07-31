@@ -315,8 +315,19 @@ export default function IntegracaoWhatsApp() {
 
         window.FB.login(
             (response) => {
+                console.log(
+                    "RESPOSTA COMPLETA DO FB.LOGIN:",
+                    response
+                );
+
                 const code =
                     response.authResponse?.code;
+
+                console.log(
+                    "CÓDIGO RECEBIDO NO CALLBACK:",
+                    code
+                );
+
 
                 if (!code) {
                     setConectando(false);
