@@ -5,8 +5,6 @@ import {
 type ConcluirIntegracaoParams = {
     empresaId: number;
     code: string;
-    wabaId?: string;
-    phoneNumberId?: string;
 };
 
 type RespostaTokenMeta = {
@@ -28,7 +26,6 @@ type RespostaDebugToken = {
         type?: string;
         application?: string;
         is_valid?: boolean;
-
         scopes?: string[];
 
         granular_scopes?: Array<{
@@ -52,11 +49,6 @@ type DadosNumeroWhatsApp = {
     verified_name?: string;
     code_verification_status?: string;
     quality_rating?: string;
-
-    error?: {
-        message?: string;
-        code?: number;
-    };
 };
 
 type RespostaNumerosWaba = {
@@ -71,16 +63,38 @@ type RespostaNumerosWaba = {
     };
 };
 
+type RespostaMetaSimples = {
+    success?: boolean;
+
+    error?: {
+        message?: string;
+        type?: string;
+        code?: number;
+        error_subcode?: number;
+        fbtrace_id?: string;
+    };
+};
+
 function obterConfiguracaoMeta() {
     const appId =
-        process.env.META_APP_ID;
+        process.env.META_APP_ID?.trim();
 
     const appSecret =
-        process.env.META_APP_SECRET;
+        process.env.META_APP_SECRET?.trim();
+
+    const redirectUri =
+        process.env.META_REDIRECT_URI?.trim();
 
     const versaoGraph =
-        process.env.META_GRAPH_API_VERSION ??
+        process.env
+            .META_GRAPH_API_VERSION
+            ?.trim() ??
         "v24.0";
+
+    const systemUserToken =
+        process.env
+            .META_SYSTEM_USER_TOKEN
+            ?.trim();
 
     if (!appId) {
         throw new Error(
@@ -94,25 +108,48 @@ function obterConfiguracaoMeta() {
         );
     }
 
+    if (!redirectUri) {
+        throw new Error(
+            "META_REDIRECT_URI não configurada"
+        );
+    }
+
+    let urlRedirect: URL;
+
+    try {
+        urlRedirect =
+            new URL(redirectUri);
+    } catch {
+        throw new Error(
+            "META_REDIRECT_URI inválida"
+        );
+    }
+
+    if (
+        urlRedirect.protocol !==
+        "https:"
+    ) {
+        throw new Error(
+            "META_REDIRECT_URI deve utilizar HTTPS"
+        );
+    }
+
     return {
         appId,
         appSecret,
+        redirectUri,
         versaoGraph,
+        systemUserToken,
     };
 }
 
 async function trocarCodePorToken(
     code: string
 ) {
-    if (!code) {
-        throw new Error(
-            "Código de autorização não informado"
-        );
-    }
-
     const {
         appId,
         appSecret,
+        redirectUri,
         versaoGraph,
     } = obterConfiguracaoMeta();
 
@@ -120,6 +157,8 @@ async function trocarCodePorToken(
         new URLSearchParams({
             client_id: appId,
             client_secret: appSecret,
+            redirect_uri:
+                redirectUri,
             code,
         });
 
@@ -142,7 +181,7 @@ async function trocarCodePorToken(
         !dados.access_token
     ) {
         console.error(
-            "Erro ao trocar code por token:",
+            "Erro ao trocar o código por token:",
             JSON.stringify(
                 dados,
                 null,
@@ -166,13 +205,20 @@ async function descobrirWabaId(
         appId,
         appSecret,
         versaoGraph,
+        systemUserToken,
     } = obterConfiguracaoMeta();
 
     /*
-     * O app access token é usado apenas para
-     * autenticar a chamada ao debug_token.
+     * A Meta recomenda autenticar o debug_token
+     * com um token que tenha permissão para
+     * inspecionar o token retornado.
+     *
+     * Usamos o token de usuário do sistema quando
+     * ele estiver configurado. Caso contrário,
+     * usamos o App Access Token.
      */
-    const appAccessToken =
+    const tokenParaDebug =
+        systemUserToken ??
         `${appId}|${appSecret}`;
 
     const parametros =
@@ -192,20 +238,20 @@ async function descobrirWabaId(
 
             headers: {
                 Authorization:
-                    `Bearer ${appAccessToken}`,
+                    `Bearer ${tokenParaDebug}`,
             },
         });
 
     const dados =
         await resposta.json() as
-        RespostaDebugToken;
+            RespostaDebugToken;
 
     if (
         !resposta.ok ||
         !dados.data?.is_valid
     ) {
         console.error(
-            "Erro ao consultar debug_token:",
+            "Erro no debug_token:",
             JSON.stringify(
                 dados,
                 null,
@@ -215,15 +261,25 @@ async function descobrirWabaId(
 
         throw new Error(
             dados.error?.message ??
-            "Token retornado pela Meta é inválido"
+            "O token retornado pela Meta é inválido"
+        );
+    }
+
+    if (
+        dados.data.app_id &&
+        dados.data.app_id !== appId
+    ) {
+        throw new Error(
+            "O token retornado pertence a outro aplicativo Meta"
         );
     }
 
     const escopoWhatsApp =
-        dados.data.granular_scopes
+        dados.data
+            .granular_scopes
             ?.find(
-                (escopo) =>
-                    escopo.scope ===
+                (item) =>
+                    item.scope ===
                     "whatsapp_business_management"
             );
 
@@ -234,7 +290,7 @@ async function descobrirWabaId(
 
     if (wabaIds.length === 0) {
         console.error(
-            "Debug token sem WABA compartilhada:",
+            "Nenhuma WABA encontrada no token:",
             JSON.stringify(
                 dados,
                 null,
@@ -243,14 +299,10 @@ async function descobrirWabaId(
         );
 
         throw new Error(
-            "Nenhuma conta do WhatsApp Business foi compartilhada pela Meta"
+            "Nenhuma conta do WhatsApp Business foi compartilhada durante o cadastro"
         );
     }
 
-    /*
-     * Neste primeiro momento usamos a primeira
-     * WABA compartilhada pelo cadastro.
-     */
     return wabaIds[0];
 }
 
@@ -273,7 +325,8 @@ async function buscarNumerosDaWaba(
     const url =
         `https://graph.facebook.com/` +
         `${versaoGraph}/` +
-        `${wabaId}/phone_numbers?fields=${campos}`;
+        `${wabaId}/phone_numbers?fields=` +
+        encodeURIComponent(campos);
 
     const resposta =
         await fetch(url, {
@@ -287,11 +340,11 @@ async function buscarNumerosDaWaba(
 
     const dados =
         await resposta.json() as
-        RespostaNumerosWaba;
+            RespostaNumerosWaba;
 
     if (!resposta.ok) {
         console.error(
-            "Erro ao buscar números da WABA:",
+            "Erro ao consultar números da WABA:",
             JSON.stringify(
                 dados,
                 null,
@@ -301,7 +354,7 @@ async function buscarNumerosDaWaba(
 
         throw new Error(
             dados.error?.message ??
-            "Não foi possível consultar os números da WABA"
+            "Não foi possível consultar os números do WhatsApp"
         );
     }
 
@@ -337,25 +390,22 @@ async function inscreverWabaNoWebhook(
             headers: {
                 Authorization:
                     `Bearer ${accessToken}`,
+
+                "Content-Type":
+                    "application/json",
             },
         });
 
     const dados =
-        await resposta.json() as {
-            success?: boolean;
-
-            error?: {
-                message?: string;
-                code?: number;
-            };
-        };
+        await resposta.json() as
+            RespostaMetaSimples;
 
     if (
         !resposta.ok ||
         dados.success !== true
     ) {
         console.error(
-            "Erro ao inscrever WABA:",
+            "Erro ao inscrever a WABA no webhook:",
             JSON.stringify(
                 dados,
                 null,
@@ -365,7 +415,7 @@ async function inscreverWabaNoWebhook(
 
         throw new Error(
             dados.error?.message ??
-            "Não foi possível inscrever a WABA no webhook"
+            "Não foi possível inscrever a conta no webhook"
         );
     }
 }
@@ -373,55 +423,57 @@ async function inscreverWabaNoWebhook(
 export async function concluirIntegracaoWhatsApp({
     empresaId,
     code,
-    wabaId,
-    phoneNumberId,
 }: ConcluirIntegracaoParams) {
     if (
-        !empresaId ||
-        !code
+        !Number.isInteger(empresaId) ||
+        empresaId <= 0
     ) {
         throw new Error(
-            "Dados da integração incompletos"
+            "Empresa inválida"
+        );
+    }
+
+    const codigoLimpo =
+        code.trim();
+
+    if (!codigoLimpo) {
+        throw new Error(
+            "Código de autorização não informado"
         );
     }
 
     const accessToken =
         await trocarCodePorToken(
-            code
+            codigoLimpo
         );
 
-    const wabaIdFinal =
-        wabaId ||
+    const wabaId =
         await descobrirWabaId(
             accessToken
         );
 
     const numeros =
         await buscarNumerosDaWaba(
-            wabaIdFinal,
+            wabaId,
             accessToken
         );
 
+    /*
+     * Neste primeiro momento, cada integração
+     * utilizará o primeiro número disponível
+     * dentro da WABA compartilhada.
+     */
     const numeroSelecionado =
-        phoneNumberId
-            ? numeros.find(
-                (numero) =>
-                    numero.id ===
-                    phoneNumberId
-            )
-            : numeros[0];
+        numeros[0];
 
-    if (
-        !numeroSelecionado ||
-        !numeroSelecionado.id
-    ) {
+    if (!numeroSelecionado?.id) {
         throw new Error(
-            "O número selecionado não pertence à WABA compartilhada"
+            "A Meta não retornou o Phone Number ID"
         );
     }
 
     await inscreverWabaNoWebhook(
-        wabaIdFinal,
+        wabaId,
         accessToken
     );
 
@@ -431,8 +483,7 @@ export async function concluirIntegracaoWhatsApp({
         );
 
     return {
-        wabaId:
-            wabaIdFinal,
+        wabaId,
 
         phoneNumberId:
             numeroSelecionado.id,

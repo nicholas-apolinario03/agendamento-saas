@@ -5,290 +5,115 @@ import {
     useState,
 } from "react";
 
+import axios from "axios";
+
 import { api } from "../services/api";
 
-type StatusIntegracao = {
-    conectado: boolean;
-    numeroExibicao?: string | null;
-    nomeVerificado?: string | null;
-    wabaId?: string | null;
-    phoneNumberId?: string | null;
-};
-
-type DadosCadastroWhatsApp = {
+type IntegracaoWhatsAppDados = {
+    id?: number;
+    empresaId?: number;
     wabaId: string;
     phoneNumberId: string;
+    numeroExibicao?: string | null;
+    nomeVerificado?: string | null;
+    conectado: boolean;
+    conectadoEm?: string;
 };
 
-type MensagemEmbeddedSignup = {
-    type?: string;
-    event?: string;
-    data?: {
-        waba_id?: string;
-        phone_number_id?: string;
-    };
+type RespostaStatus = {
+    conectado: boolean;
+    integracao: IntegracaoWhatsAppDados | null;
 };
 
-const META_APP_ID = import.meta.env.VITE_META_APP_ID;
-const META_CONFIG_ID = import.meta.env.VITE_META_CONFIG_ID;
-const META_GRAPH_VERSION = "v24.0";
+type RespostaConexao = {
+    mensagem: string;
+    integracao: IntegracaoWhatsAppDados;
+};
 
-function interpretarMensagemMeta(
-    valor: unknown
-): MensagemEmbeddedSignup | null {
-    try {
-        if (typeof valor === "string") {
-            return JSON.parse(valor) as MensagemEmbeddedSignup;
-        }
-
-        if (typeof valor === "object" && valor !== null) {
-            return valor as MensagemEmbeddedSignup;
-        }
-
-        return null;
-    } catch {
-        return null;
-    }
-}
+const META_SIGNUP_URL =
+    import.meta.env.VITE_META_SIGNUP_URL;
 
 export default function IntegracaoWhatsApp() {
-    const [sdkCarregado, setSdkCarregado] = useState(false);
-    const [carregandoStatus, setCarregandoStatus] = useState(true);
-    const [conectando, setConectando] = useState(false);
-    const [desconectando, setDesconectando] = useState(false);
+    const [carregandoStatus, setCarregandoStatus] =
+        useState(true);
 
-    const [status, setStatus] = useState<StatusIntegracao>({
-        conectado: false,
-    });
+    const [conectando, setConectando] =
+        useState(false);
 
-    const [mensagem, setMensagem] = useState("");
-    const [erro, setErro] = useState("");
+    const [desconectando, setDesconectando] =
+        useState(false);
 
-    const codigoRef = useRef<string | null>(null);
+    const [integracao, setIntegracao] =
+        useState<IntegracaoWhatsAppDados | null>(
+            null
+        );
 
-    const dadosCadastroRef =
-        useRef<DadosCadastroWhatsApp | null>(null);
+    const [mensagem, setMensagem] =
+        useState("");
 
-    const conexaoEnviadaRef = useRef(false);
+    const [erro, setErro] =
+        useState("");
 
-    const buscarStatus = useCallback(async () => {
-        try {
-            setCarregandoStatus(true);
-            setErro("");
+    /*
+     * Evita processar duas vezes o mesmo retorno,
+     * principalmente no StrictMode do React.
+     */
+    const retornoProcessadoRef =
+        useRef(false);
 
-            const resposta = await api.get<StatusIntegracao>(
-                "/empresa/whatsapp/status"
-            );
+    const buscarStatus =
+        useCallback(async () => {
+            try {
+                setCarregandoStatus(true);
+                setErro("");
 
-            setStatus(resposta.data);
-        } catch (error) {
-            console.error("Erro ao consultar integração:", error);
+                const resposta =
+                    await api.get<RespostaStatus>(
+                        "/empresa/whatsapp/status"
+                    );
 
-            setErro(
-                "Não foi possível consultar o status da integração com o WhatsApp."
-            );
-        } finally {
-            setCarregandoStatus(false);
-        }
-    }, []);
+                setIntegracao(
+                    resposta.data.integracao
+                );
+            } catch (error) {
+                console.error(
+                    "Erro ao consultar integração:",
+                    error
+                );
 
-    const concluirConexao = useCallback(async () => {
-        const code = codigoRef.current;
-        const dadosCadastro = dadosCadastroRef.current;
-
-        if (!code || !dadosCadastro) {
-            return;
-        }
-
-        if (conexaoEnviadaRef.current) {
-            return;
-        }
-
-        conexaoEnviadaRef.current = true;
-
-        try {
-            setConectando(true);
-            setErro("");
-            setMensagem("Finalizando a conexão com o WhatsApp...");
-
-            const resposta = await api.post<StatusIntegracao>(
-                "/empresa/whatsapp/concluir-conexao",
-                {
-                    code,
-                    wabaId: dadosCadastro.wabaId,
-                    phoneNumberId: dadosCadastro.phoneNumberId,
-                }
-            );
-
-            setStatus({
-                ...resposta.data,
-                conectado: true,
-            });
-
-            setMensagem("WhatsApp conectado com sucesso.");
-
-            codigoRef.current = null;
-            dadosCadastroRef.current = null;
-        } catch (error) {
-            console.error("Erro ao concluir conexão:", error);
-
-            conexaoEnviadaRef.current = false;
-
-            setMensagem("");
-            setErro(
-                "A Meta concluiu o cadastro, mas não foi possível salvar a integração no sistema."
-            );
-        } finally {
-            setConectando(false);
-        }
-    }, []);
+                setErro(
+                    "Não foi possível consultar o status da integração com o WhatsApp."
+                );
+            } finally {
+                setCarregandoStatus(false);
+            }
+        }, []);
 
     useEffect(() => {
         void buscarStatus();
     }, [buscarStatus]);
 
-    useEffect(() => {
-        if (!META_APP_ID) {
-            setErro(
-                "A variável VITE_META_APP_ID não foi configurada."
-            );
+    function limparParametrosDaMeta() {
+        const urlLimpa =
+            `${window.location.origin}` +
+            `${window.location.pathname}`;
 
-            return;
-        }
-
-        const sdkExistente = document.getElementById(
-            "facebook-jssdk"
-        ) as HTMLScriptElement | null;
-
-        window.fbAsyncInit = () => {
-            window.FB?.init({
-                appId: META_APP_ID,
-                cookie: true,
-                xfbml: true,
-                version: META_GRAPH_VERSION,
-                autoLogAppEvents: true,
-            });
-
-            setSdkCarregado(true);
-        };
-
-        if (sdkExistente) {
-            if (window.FB) {
-                window.fbAsyncInit();
-            }
-
-            return;
-        }
-
-        const script = document.createElement("script");
-
-        script.id = "facebook-jssdk";
-        script.src =
-            "https://connect.facebook.net/pt_BR/sdk.js";
-        script.async = true;
-        script.defer = true;
-        script.crossOrigin = "anonymous";
-
-        script.onerror = () => {
-            setErro(
-                "Não foi possível carregar o SDK da Meta."
-            );
-        };
-
-        document.body.appendChild(script);
-
-        return () => {
-            script.onerror = null;
-        };
-    }, []);
-
-    useEffect(() => {
-        function receberMensagemMeta(event: MessageEvent) {
-            console.log("ORIGIN", event.origin);
-            console.log("DATA", event.data);
-            const origensPermitidas = [
-                "https://www.facebook.com",
-                "https://web.facebook.com",
-            ];
-
-            if (!origensPermitidas.includes(event.origin)) {
-                return;
-            }
-
-            const mensagemMeta = interpretarMensagemMeta(
-                event.data
-            );
-
-            if (
-                mensagemMeta?.type !== "WA_EMBEDDED_SIGNUP"
-            ) {
-                return;
-            }
-
-            if (mensagemMeta.event === "FINISH") {
-                const wabaId =
-                    mensagemMeta.data?.waba_id;
-
-                const phoneNumberId =
-                    mensagemMeta.data?.phone_number_id;
-
-                if (!wabaId || !phoneNumberId) {
-                    setErro(
-                        "A Meta finalizou o cadastro, mas não retornou os identificadores do WhatsApp."
-                    );
-
-                    return;
-                }
-
-                dadosCadastroRef.current = {
-                    wabaId,
-                    phoneNumberId,
-                };
-
-                setMensagem(
-                    "Cadastro concluído na Meta. Salvando a integração..."
-                );
-
-                void concluirConexao();
-
-                return;
-            }
-
-            if (mensagemMeta.event === "CANCEL") {
-                setConectando(false);
-                setMensagem("");
-                setErro(
-                    "O cadastro do WhatsApp foi cancelado."
-                );
-
-                return;
-            }
-
-            if (mensagemMeta.event === "ERROR") {
-                setConectando(false);
-                setMensagem("");
-                setErro(
-                    "A Meta informou um erro durante o cadastro do WhatsApp."
-                );
-            }
-        }
-
-        window.addEventListener(
-            "message",
-            receberMensagemMeta
+        window.history.replaceState(
+            {},
+            document.title,
+            urlLimpa
         );
+    }
 
-        return () => {
-            window.removeEventListener(
-                "message",
-                receberMensagemMeta
-            );
-        };
-    }, [concluirConexao]);
-
-    async function concluirConexaoSomenteComCodigo(
+    async function concluirConexao(
         code: string
     ) {
+        if (retornoProcessadoRef.current) {
+            return;
+        }
+
+        retornoProcessadoRef.current = true;
+
         try {
             setConectando(true);
             setErro("");
@@ -297,143 +122,196 @@ export default function IntegracaoWhatsApp() {
             );
 
             const resposta =
-                await api.post<{
-                    mensagem: string;
-
-                    integracao: {
-                        wabaId: string;
-                        phoneNumberId: string;
-                        numeroExibicao?: string | null;
-                        nomeVerificado?: string | null;
-                        conectado: boolean;
-                    };
-                }>(
+                await api.post<RespostaConexao>(
                     "/empresa/whatsapp/concluir-conexao",
                     {
                         code,
                     }
                 );
 
-            const integracao =
-                resposta.data.integracao;
-
-            setStatus({
-                conectado:
-                    integracao.conectado,
-
-                wabaId:
-                    integracao.wabaId,
-
-                phoneNumberId:
-                    integracao.phoneNumberId,
-
-                numeroExibicao:
-                    integracao.numeroExibicao,
-
-                nomeVerificado:
-                    integracao.nomeVerificado,
-            });
+            setIntegracao(
+                resposta.data.integracao
+            );
 
             setMensagem(
                 "WhatsApp conectado com sucesso."
             );
-
-            codigoRef.current = null;
-            dadosCadastroRef.current = null;
-
         } catch (error) {
+            retornoProcessadoRef.current =
+                false;
+
             console.error(
-                "Erro ao concluir conexão:",
+                "Erro ao concluir integração:",
                 error
             );
 
             setMensagem("");
 
+            if (axios.isAxiosError(error)) {
+                const mensagemBackend =
+                    error.response?.data?.erro;
+
+                setErro(
+                    typeof mensagemBackend ===
+                        "string"
+                        ? mensagemBackend
+                        : "Não foi possível concluir a integração com o WhatsApp."
+                );
+
+                return;
+            }
+
             setErro(
-                "A autorização foi recebida, mas não foi possível concluir a integração."
+                "Não foi possível concluir a integração com o WhatsApp."
             );
         } finally {
             setConectando(false);
+            limparParametrosDaMeta();
         }
     }
 
-    function conectarWhatsApp() {
-        if (!META_CONFIG_ID) {
-            setErro(
-                "A variável VITE_META_CONFIG_ID não foi configurada."
-            );
-
+    /*
+     * Processa o retorno da Meta quando ela
+     * redirecionar novamente para /dashboard.
+     */
+    useEffect(() => {
+        if (retornoProcessadoRef.current) {
             return;
         }
 
-        if (!sdkCarregado || !window.FB) {
-            setErro(
-                "O SDK da Meta ainda não terminou de carregar."
+        const parametrosQuery =
+            new URLSearchParams(
+                window.location.search
             );
 
-            return;
-        }
+        /*
+         * Alguns fluxos podem retornar parâmetros
+         * no fragmento da URL.
+         */
+        const hashSemCerquilha =
+            window.location.hash.replace(
+                /^#/,
+                ""
+            );
 
-        codigoRef.current = null;
-        dadosCadastroRef.current = null;
-        conexaoEnviadaRef.current = false;
-
-        setConectando(true);
-        setErro("");
-        setMensagem(
-            "Conclua o cadastro na janela da Meta."
-        );
-
-       window.FB.login(
-    (response) => {
-        console.log(
-            "RESPOSTA COMPLETA DO FB.LOGIN:",
-            response
-        );
+        const parametrosHash =
+            new URLSearchParams(
+                hashSemCerquilha
+            );
 
         const code =
-            response.authResponse?.code;
+            parametrosQuery.get("code") ??
+            parametrosHash.get("code");
 
-        console.log(
-            "CÓDIGO RECEBIDO NO CALLBACK:",
-            code
-        );
+        const erroMeta =
+            parametrosQuery.get("error") ??
+            parametrosHash.get("error");
 
-        if (!code) {
-            setConectando(false);
-            setMensagem("");
+        const descricaoErro =
+            parametrosQuery.get(
+                "error_description"
+            ) ??
+            parametrosHash.get(
+                "error_description"
+            );
+
+        const conexaoEmAndamento =
+            sessionStorage.getItem(
+                "whatsappConexaoEmAndamento"
+            );
+
+        if (erroMeta) {
+            sessionStorage.removeItem(
+                "whatsappConexaoEmAndamento"
+            );
 
             setErro(
-                "A Meta não retornou o código de autorização."
+                descricaoErro ??
+                "A conexão com o WhatsApp foi cancelada ou recusada."
+            );
+
+            setMensagem("");
+            limparParametrosDaMeta();
+
+            return;
+        }
+
+        if (!code) {
+            return;
+        }
+
+        /*
+         * O marcador reduz o risco de processarmos
+         * um parâmetro code que não pertença a esse
+         * fluxo de conexão.
+         */
+        if (
+            conexaoEmAndamento !== "true"
+        ) {
+            setErro(
+                "Foi recebido um retorno da Meta, mas não foi encontrada uma conexão em andamento."
+            );
+
+            limparParametrosDaMeta();
+
+            return;
+        }
+
+        sessionStorage.removeItem(
+            "whatsappConexaoEmAndamento"
+        );
+
+        void concluirConexao(code);
+    }, []);
+
+    function conectarWhatsApp() {
+        if (!META_SIGNUP_URL) {
+            setErro(
+                "A variável VITE_META_SIGNUP_URL não foi configurada."
             );
 
             return;
         }
 
-        codigoRef.current = code;
+        try {
+            const url =
+                new URL(META_SIGNUP_URL);
 
-        void concluirConexaoSomenteComCodigo(
-            code
+            if (
+                url.protocol !== "https:"
+            ) {
+                throw new Error(
+                    "A URL precisa utilizar HTTPS"
+                );
+            }
+        } catch {
+            setErro(
+                "A URL do Cadastro Incorporado da Meta é inválida."
+            );
+
+            return;
+        }
+
+        setErro("");
+        setMensagem(
+            "Redirecionando para o cadastro do WhatsApp..."
         );
-    },
-    {
-        config_id: META_CONFIG_ID,
-        response_type: "code",
-        override_default_response_type: true,
 
-        extras: {
-            setup: {},
-            featureType: "",
-            sessionInfoVersion: "3",
-        },
-    }
-);
+        sessionStorage.setItem(
+            "whatsappConexaoEmAndamento",
+            "true"
+        );
+
+        window.location.assign(
+            META_SIGNUP_URL
+        );
     }
 
     async function desconectarWhatsApp() {
-        const confirmou = window.confirm(
-            "Deseja realmente desconectar o WhatsApp desta empresa?"
-        );
+        const confirmou =
+            window.confirm(
+                "Deseja realmente desconectar o WhatsApp desta empresa?"
+            );
 
         if (!confirmou) {
             return;
@@ -448,12 +326,10 @@ export default function IntegracaoWhatsApp() {
                 "/empresa/whatsapp/desconectar"
             );
 
-            setStatus({
-                conectado: false,
-            });
+            setIntegracao(null);
 
             setMensagem(
-                "Integração desconectada do sistema."
+                "WhatsApp desconectado do sistema."
             );
         } catch (error) {
             console.error(
@@ -461,8 +337,22 @@ export default function IntegracaoWhatsApp() {
                 error
             );
 
+            if (axios.isAxiosError(error)) {
+                const mensagemBackend =
+                    error.response?.data?.erro;
+
+                setErro(
+                    typeof mensagemBackend ===
+                        "string"
+                        ? mensagemBackend
+                        : "Não foi possível desconectar o WhatsApp."
+                );
+
+                return;
+            }
+
             setErro(
-                "Não foi possível desconectar a integração."
+                "Não foi possível desconectar o WhatsApp."
             );
         } finally {
             setDesconectando(false);
@@ -472,33 +362,53 @@ export default function IntegracaoWhatsApp() {
     if (carregandoStatus) {
         return (
             <section>
-                <h2>Integração com WhatsApp</h2>
-                <p>Consultando integração...</p>
+                <h2>
+                    Integração com WhatsApp
+                </h2>
+
+                <p>
+                    Consultando integração...
+                </p>
             </section>
         );
     }
 
     return (
         <section>
-            <h2>Integração com WhatsApp</h2>
+            <h2>
+                Integração com WhatsApp
+            </h2>
 
-            {status.conectado ? (
+            {integracao?.conectado ? (
                 <div>
                     <p>
-                        <strong>Status:</strong> conectado
+                        <strong>
+                            Status:
+                        </strong>{" "}
+                        conectado
                     </p>
 
-                    {status.numeroExibicao && (
+                    {integracao.numeroExibicao && (
                         <p>
-                            <strong>Número:</strong>{" "}
-                            {status.numeroExibicao}
+                            <strong>
+                                Número:
+                            </strong>{" "}
+                            {
+                                integracao
+                                    .numeroExibicao
+                            }
                         </p>
                     )}
 
-                    {status.nomeVerificado && (
+                    {integracao.nomeVerificado && (
                         <p>
-                            <strong>Nome:</strong>{" "}
-                            {status.nomeVerificado}
+                            <strong>
+                                Nome:
+                            </strong>{" "}
+                            {
+                                integracao
+                                    .nomeVerificado
+                            }
                         </p>
                     )}
 
@@ -507,7 +417,9 @@ export default function IntegracaoWhatsApp() {
                         onClick={() =>
                             void desconectarWhatsApp()
                         }
-                        disabled={desconectando}
+                        disabled={
+                            desconectando
+                        }
                     >
                         {desconectando
                             ? "Desconectando..."
@@ -517,33 +429,36 @@ export default function IntegracaoWhatsApp() {
             ) : (
                 <div>
                     <p>
-                        Conecte o número comercial da empresa
-                        para receber e responder mensagens pelo
+                        Conecte o número comercial
+                        da empresa para receber e
+                        responder mensagens pelo
                         sistema.
                     </p>
 
                     <button
                         type="button"
-                        onClick={conectarWhatsApp}
-                        disabled={
-                            conectando || !sdkCarregado
+                        onClick={
+                            conectarWhatsApp
                         }
+                        disabled={conectando}
                     >
                         {conectando
                             ? "Conectando..."
-                            : sdkCarregado
-                                ? "Conectar WhatsApp"
-                                : "Carregando Meta..."}
+                            : "Conectar WhatsApp"}
                     </button>
                 </div>
             )}
 
             {mensagem && (
-                <p role="status">{mensagem}</p>
+                <p role="status">
+                    {mensagem}
+                </p>
             )}
 
             {erro && (
-                <p role="alert">{erro}</p>
+                <p role="alert">
+                    {erro}
+                </p>
             )}
         </section>
     );

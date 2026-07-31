@@ -10,10 +10,12 @@ import {
     auth,
 } from "../middleware/auth";
 
-import { concluirIntegracaoWhatsApp, } from "../service/integracaoWhatsapp";
+import {
+    concluirIntegracaoWhatsApp,
+} from "../service/integracaoWhatsapp";
+
 const integracaoWhatsAppRoutes =
     Router();
-
 
 integracaoWhatsAppRoutes.get(
     "/empresa/whatsapp/status",
@@ -35,6 +37,7 @@ integracaoWhatsAppRoutes.get(
 
                         select: {
                             id: true,
+                            empresaId: true,
                             wabaId: true,
                             phoneNumberId:
                                 true,
@@ -53,23 +56,14 @@ integracaoWhatsAppRoutes.get(
                         },
                     });
 
-            if (!integracao) {
-                return res.json({
-                    conectado:
-                        false,
-                    integracao:
-                        null,
-                });
-            }
-
             return res.json({
                 conectado:
-                    integracao
-                        .conectado,
+                    integracao?.conectado ??
+                    false,
 
-                integracao,
+                integracao:
+                    integracao ?? null,
             });
-
         } catch (erro) {
             console.error(
                 "Erro ao consultar integração:",
@@ -86,7 +80,6 @@ integracaoWhatsAppRoutes.get(
     }
 );
 
-
 integracaoWhatsAppRoutes.post(
     "/empresa/whatsapp/concluir-conexao",
     auth,
@@ -99,8 +92,6 @@ integracaoWhatsAppRoutes.post(
 
             const {
                 code,
-                wabaId,
-                phoneNumberId,
             } = req.body;
 
             if (
@@ -115,37 +106,12 @@ integracaoWhatsAppRoutes.post(
                     });
             }
 
-            if (
-                wabaId !== undefined &&
-                typeof wabaId !== "string"
-            ) {
-                return res
-                    .status(400)
-                    .json({
-                        erro:
-                            "WABA ID inválido",
-                    });
-            }
-
-            if (
-                phoneNumberId !== undefined &&
-                typeof phoneNumberId !== "string"
-            ) {
-                return res
-                    .status(400)
-                    .json({
-                        erro:
-                            "Phone Number ID inválido",
-                    });
-            }
-
             const empresa =
                 await prisma
                     .empresa
                     .findUnique({
                         where: {
-                            id:
-                                empresaId,
+                            id: empresaId,
                         },
 
                         select: {
@@ -169,21 +135,7 @@ integracaoWhatsAppRoutes.post(
             const dadosIntegracao =
                 await concluirIntegracaoWhatsApp({
                     empresaId,
-
-                    code:
-                        code.trim(),
-
-                    wabaId:
-                        typeof wabaId === "string" &&
-                            wabaId.trim()
-                            ? wabaId.trim()
-                            : undefined,
-
-                    phoneNumberId:
-                        typeof phoneNumberId === "string" &&
-                            phoneNumberId.trim()
-                            ? phoneNumberId.trim()
-                            : undefined,
+                    code: code.trim(),
                 });
 
             const integracao =
@@ -277,7 +229,6 @@ integracaoWhatsAppRoutes.post(
 
                     integracao,
                 });
-
         } catch (erro) {
             console.error(
                 "Erro ao concluir conexão do WhatsApp:",
@@ -295,7 +246,6 @@ integracaoWhatsAppRoutes.post(
         }
     }
 );
-
 
 integracaoWhatsAppRoutes.delete(
     "/empresa/whatsapp/desconectar",
@@ -342,7 +292,6 @@ integracaoWhatsAppRoutes.delete(
                 mensagem:
                     "WhatsApp desconectado com sucesso",
             });
-
         } catch (erro) {
             console.error(
                 "Erro ao desconectar WhatsApp:",
@@ -358,6 +307,5 @@ integracaoWhatsAppRoutes.delete(
         }
     }
 );
-
 
 export default integracaoWhatsAppRoutes;
