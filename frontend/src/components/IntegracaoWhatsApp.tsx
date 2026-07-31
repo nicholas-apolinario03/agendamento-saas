@@ -204,6 +204,8 @@ export default function IntegracaoWhatsApp() {
 
     useEffect(() => {
         function receberMensagemMeta(event: MessageEvent) {
+            console.log("ORIGIN", event.origin);
+            console.log("DATA", event.data);
             const origensPermitidas = [
                 "https://www.facebook.com",
                 "https://web.facebook.com",
@@ -446,8 +448,8 @@ export default function IntegracaoWhatsApp() {
                         {conectando
                             ? "Conectando..."
                             : sdkCarregado
-                              ? "Conectar WhatsApp"
-                              : "Carregando Meta..."}
+                                ? "Conectar WhatsApp"
+                                : "Carregando Meta..."}
                     </button>
                 </div>
             )}
