@@ -285,7 +285,7 @@ export default function IntegracaoWhatsApp() {
             );
         };
     }, [concluirConexao]);
-    
+
     async function concluirConexaoSomenteComCodigo(
         code: string
     ) {
@@ -384,54 +384,50 @@ export default function IntegracaoWhatsApp() {
             "Conclua o cadastro na janela da Meta."
         );
 
-        window.FB.login(
-            (response) => {
-                console.log(
-                    "RESPOSTA COMPLETA DO FB.LOGIN:",
-                    response
-                );
-
-                const code =
-                    response.authResponse?.code;
-
-                console.log(
-                    "CÓDIGO RECEBIDO NO CALLBACK:",
-                    code
-                );
-
-
-                if (!code) {
-                    setConectando(false);
-                    setMensagem("");
-
-                    setErro(
-                        "A Meta não retornou o código de autorização."
-                    );
-
-                    return;
-                }
-
-                codigoRef.current = code;
-
-                console.log(
-                    "Código recebido. Enviando ao backend para diagnóstico."
-                );
-
-                void concluirConexaoSomenteComCodigo(
-                    code
-                );
-            },
-            {
-                config_id: META_CONFIG_ID,
-                response_type: "code",
-                override_default_response_type: true,
-                extras: {
-                    setup: {},
-                    featureType: "",
-                    sessionInfoVersion: "3",
-                },
-            }
+       window.FB.login(
+    (response) => {
+        console.log(
+            "RESPOSTA COMPLETA DO FB.LOGIN:",
+            response
         );
+
+        const code =
+            response.authResponse?.code;
+
+        console.log(
+            "CÓDIGO RECEBIDO NO CALLBACK:",
+            code
+        );
+
+        if (!code) {
+            setConectando(false);
+            setMensagem("");
+
+            setErro(
+                "A Meta não retornou o código de autorização."
+            );
+
+            return;
+        }
+
+        codigoRef.current = code;
+
+        void concluirConexaoSomenteComCodigo(
+            code
+        );
+    },
+    {
+        config_id: META_CONFIG_ID,
+        response_type: "code",
+        override_default_response_type: true,
+
+        extras: {
+            setup: {},
+            featureType: "",
+            sessionInfoVersion: "3",
+        },
+    }
+);
     }
 
     async function desconectarWhatsApp() {

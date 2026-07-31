@@ -122,18 +122,16 @@ async function trocarCodePorToken(
 
     const {
         appId,
-    appSecret,
-    versaoGraph,
-    redirectUri,
+        appSecret,
+        versaoGraph,
     } = obterConfiguracaoMeta();
 
-   const parametros =
-    new URLSearchParams({
-        client_id: appId,
-        client_secret: appSecret,
-        redirect_uri: redirectUri,
-        code,
-    });
+    const parametros =
+        new URLSearchParams({
+            client_id: appId,
+            client_secret: appSecret,
+            code,
+        });
 
     const url =
         `https://graph.facebook.com/` +
@@ -147,7 +145,7 @@ async function trocarCodePorToken(
 
     const dados =
         await resposta.json() as
-        RespostaTokenMeta;
+            RespostaTokenMeta;
 
     if (
         !resposta.ok ||
