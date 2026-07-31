@@ -285,44 +285,7 @@ export default function IntegracaoWhatsApp() {
             );
         };
     }, [concluirConexao]);
-    async function testarCodigoNoBackend(
-        code: string
-    ) {
-        try {
-            setConectando(true);
-            setErro("");
-            setMensagem(
-                "Verificando a autorização com a Meta..."
-            );
-
-            const resposta = await api.post(
-                "/empresa/whatsapp/testar-codigo",
-                {
-                    code,
-                }
-            );
-
-            console.log(
-                "DIAGNÓSTICO DO BACKEND:",
-                resposta.data
-            );
-
-            setMensagem(
-                "Autorização recebida. Consulte o Console."
-            );
-        } catch (error) {
-            console.error(
-                "ERRO AO TESTAR CÓDIGO:",
-                error
-            );
-
-            setErro(
-                "O código foi recebido, mas o backend não conseguiu validá-lo."
-            );
-        } finally {
-            setConectando(false);
-        }
-    }
+    
     async function concluirConexaoSomenteComCodigo(
         code: string
     ) {
