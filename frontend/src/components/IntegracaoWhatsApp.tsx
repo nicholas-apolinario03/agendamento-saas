@@ -285,6 +285,114 @@ export default function IntegracaoWhatsApp() {
             );
         };
     }, [concluirConexao]);
+    async function testarCodigoNoBackend(
+        code: string
+    ) {
+        try {
+            setConectando(true);
+            setErro("");
+            setMensagem(
+                "Verificando a autorização com a Meta..."
+            );
+
+            const resposta = await api.post(
+                "/empresa/whatsapp/testar-codigo",
+                {
+                    code,
+                }
+            );
+
+            console.log(
+                "DIAGNÓSTICO DO BACKEND:",
+                resposta.data
+            );
+
+            setMensagem(
+                "Autorização recebida. Consulte o Console."
+            );
+        } catch (error) {
+            console.error(
+                "ERRO AO TESTAR CÓDIGO:",
+                error
+            );
+
+            setErro(
+                "O código foi recebido, mas o backend não conseguiu validá-lo."
+            );
+        } finally {
+            setConectando(false);
+        }
+    }
+    async function concluirConexaoSomenteComCodigo(
+        code: string
+    ) {
+        try {
+            setConectando(true);
+            setErro("");
+            setMensagem(
+                "Finalizando a conexão com o WhatsApp..."
+            );
+
+            const resposta =
+                await api.post<{
+                    mensagem: string;
+
+                    integracao: {
+                        wabaId: string;
+                        phoneNumberId: string;
+                        numeroExibicao?: string | null;
+                        nomeVerificado?: string | null;
+                        conectado: boolean;
+                    };
+                }>(
+                    "/empresa/whatsapp/concluir-conexao",
+                    {
+                        code,
+                    }
+                );
+
+            const integracao =
+                resposta.data.integracao;
+
+            setStatus({
+                conectado:
+                    integracao.conectado,
+
+                wabaId:
+                    integracao.wabaId,
+
+                phoneNumberId:
+                    integracao.phoneNumberId,
+
+                numeroExibicao:
+                    integracao.numeroExibicao,
+
+                nomeVerificado:
+                    integracao.nomeVerificado,
+            });
+
+            setMensagem(
+                "WhatsApp conectado com sucesso."
+            );
+
+            codigoRef.current = null;
+            dadosCadastroRef.current = null;
+
+        } catch (error) {
+            console.error(
+                "Erro ao concluir conexão:",
+                error
+            );
+
+            setMensagem("");
+
+            setErro(
+                "A autorização foi recebida, mas não foi possível concluir a integração."
+            );
+        } finally {
+            setConectando(false);
+        }
+    }
 
     function conectarWhatsApp() {
         if (!META_CONFIG_ID) {
@@ -342,7 +450,13 @@ export default function IntegracaoWhatsApp() {
 
                 codigoRef.current = code;
 
-                void concluirConexao();
+                console.log(
+                    "Código recebido. Enviando ao backend para diagnóstico."
+                );
+
+                void concluirConexaoSomenteComCodigo(
+                    code
+                );
             },
             {
                 config_id: META_CONFIG_ID,

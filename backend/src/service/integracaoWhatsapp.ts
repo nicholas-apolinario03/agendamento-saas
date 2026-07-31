@@ -5,13 +5,38 @@ import {
 type ConcluirIntegracaoParams = {
     empresaId: number;
     code: string;
-    wabaId: string;
-    phoneNumberId: string;
+    wabaId?: string;
+    phoneNumberId?: string;
 };
 
 type RespostaTokenMeta = {
     access_token?: string;
     token_type?: string;
+
+    error?: {
+        message?: string;
+        type?: string;
+        code?: number;
+        error_subcode?: number;
+        fbtrace_id?: string;
+    };
+};
+
+type RespostaDebugToken = {
+    data?: {
+        app_id?: string;
+        type?: string;
+        application?: string;
+        is_valid?: boolean;
+
+        scopes?: string[];
+
+        granular_scopes?: Array<{
+            scope?: string;
+            target_ids?: string[];
+        }>;
+    };
+
     error?: {
         message?: string;
         type?: string;
@@ -27,9 +52,22 @@ type DadosNumeroWhatsApp = {
     verified_name?: string;
     code_verification_status?: string;
     quality_rating?: string;
+
     error?: {
         message?: string;
         code?: number;
+    };
+};
+
+type RespostaNumerosWaba = {
+    data?: DadosNumeroWhatsApp[];
+
+    error?: {
+        message?: string;
+        type?: string;
+        code?: number;
+        error_subcode?: number;
+        fbtrace_id?: string;
     };
 };
 
@@ -121,6 +159,164 @@ async function trocarCodePorToken(
     return dados.access_token;
 }
 
+async function descobrirWabaId(
+    accessToken: string
+) {
+    const {
+        appId,
+        appSecret,
+        versaoGraph,
+    } = obterConfiguracaoMeta();
+
+    /*
+     * O app access token é usado apenas para
+     * autenticar a chamada ao debug_token.
+     */
+    const appAccessToken =
+        `${appId}|${appSecret}`;
+
+    const parametros =
+        new URLSearchParams({
+            input_token:
+                accessToken,
+        });
+
+    const url =
+        `https://graph.facebook.com/` +
+        `${versaoGraph}/debug_token?` +
+        parametros.toString();
+
+    const resposta =
+        await fetch(url, {
+            method: "GET",
+
+            headers: {
+                Authorization:
+                    `Bearer ${appAccessToken}`,
+            },
+        });
+
+    const dados =
+        await resposta.json() as
+            RespostaDebugToken;
+
+    if (
+        !resposta.ok ||
+        !dados.data?.is_valid
+    ) {
+        console.error(
+            "Erro ao consultar debug_token:",
+            JSON.stringify(
+                dados,
+                null,
+                2
+            )
+        );
+
+        throw new Error(
+            dados.error?.message ??
+            "Token retornado pela Meta é inválido"
+        );
+    }
+
+    const escopoWhatsApp =
+        dados.data.granular_scopes
+            ?.find(
+                (escopo) =>
+                    escopo.scope ===
+                    "whatsapp_business_management"
+            );
+
+    const wabaIds =
+        escopoWhatsApp
+            ?.target_ids ??
+        [];
+
+    if (wabaIds.length === 0) {
+        console.error(
+            "Debug token sem WABA compartilhada:",
+            JSON.stringify(
+                dados,
+                null,
+                2
+            )
+        );
+
+        throw new Error(
+            "Nenhuma conta do WhatsApp Business foi compartilhada pela Meta"
+        );
+    }
+
+    /*
+     * Neste primeiro momento usamos a primeira
+     * WABA compartilhada pelo cadastro.
+     */
+    return wabaIds[0];
+}
+
+async function buscarNumerosDaWaba(
+    wabaId: string,
+    accessToken: string
+) {
+    const {
+        versaoGraph,
+    } = obterConfiguracaoMeta();
+
+    const campos = [
+        "id",
+        "display_phone_number",
+        "verified_name",
+        "code_verification_status",
+        "quality_rating",
+    ].join(",");
+
+    const url =
+        `https://graph.facebook.com/` +
+        `${versaoGraph}/` +
+        `${wabaId}/phone_numbers?fields=${campos}`;
+
+    const resposta =
+        await fetch(url, {
+            method: "GET",
+
+            headers: {
+                Authorization:
+                    `Bearer ${accessToken}`,
+            },
+        });
+
+    const dados =
+        await resposta.json() as
+            RespostaNumerosWaba;
+
+    if (!resposta.ok) {
+        console.error(
+            "Erro ao buscar números da WABA:",
+            JSON.stringify(
+                dados,
+                null,
+                2
+            )
+        );
+
+        throw new Error(
+            dados.error?.message ??
+            "Não foi possível consultar os números da WABA"
+        );
+    }
+
+    const numeros =
+        dados.data ?? [];
+
+    if (numeros.length === 0) {
+        throw new Error(
+            "Nenhum número foi encontrado na conta do WhatsApp Business"
+        );
+    }
+
+    return numeros;
+}
+
 async function inscreverWabaNoWebhook(
     wabaId: string,
     accessToken: string
@@ -147,6 +343,7 @@ async function inscreverWabaNoWebhook(
     const dados =
         await resposta.json() as {
             success?: boolean;
+
             error?: {
                 message?: string;
                 code?: number;
@@ -173,59 +370,6 @@ async function inscreverWabaNoWebhook(
     }
 }
 
-async function buscarDadosNumero(
-    phoneNumberId: string,
-    accessToken: string
-) {
-    const {
-        versaoGraph,
-    } = obterConfiguracaoMeta();
-
-    const campos = [
-        "display_phone_number",
-        "verified_name",
-        "code_verification_status",
-        "quality_rating",
-    ].join(",");
-
-    const url =
-        `https://graph.facebook.com/` +
-        `${versaoGraph}/` +
-        `${phoneNumberId}?fields=${campos}`;
-
-    const resposta =
-        await fetch(url, {
-            method: "GET",
-
-            headers: {
-                Authorization:
-                    `Bearer ${accessToken}`,
-            },
-        });
-
-    const dados =
-        await resposta.json() as
-            DadosNumeroWhatsApp;
-
-    if (!resposta.ok) {
-        console.error(
-            "Erro ao buscar número:",
-            JSON.stringify(
-                dados,
-                null,
-                2
-            )
-        );
-
-        throw new Error(
-            dados.error?.message ??
-            "Não foi possível consultar o número do WhatsApp"
-        );
-    }
-
-    return dados;
-}
-
 export async function concluirIntegracaoWhatsApp({
     empresaId,
     code,
@@ -234,9 +378,7 @@ export async function concluirIntegracaoWhatsApp({
 }: ConcluirIntegracaoParams) {
     if (
         !empresaId ||
-        !code ||
-        !wabaId ||
-        !phoneNumberId
+        !code
     ) {
         throw new Error(
             "Dados da integração incompletos"
@@ -248,16 +390,40 @@ export async function concluirIntegracaoWhatsApp({
             code
         );
 
-    await inscreverWabaNoWebhook(
-        wabaId,
-        accessToken
-    );
-
-    const dadosNumero =
-        await buscarDadosNumero(
-            phoneNumberId,
+    const wabaIdFinal =
+        wabaId ||
+        await descobrirWabaId(
             accessToken
         );
+
+    const numeros =
+        await buscarNumerosDaWaba(
+            wabaIdFinal,
+            accessToken
+        );
+
+    const numeroSelecionado =
+        phoneNumberId
+            ? numeros.find(
+                (numero) =>
+                    numero.id ===
+                    phoneNumberId
+            )
+            : numeros[0];
+
+    if (
+        !numeroSelecionado ||
+        !numeroSelecionado.id
+    ) {
+        throw new Error(
+            "O número selecionado não pertence à WABA compartilhada"
+        );
+    }
+
+    await inscreverWabaNoWebhook(
+        wabaIdFinal,
+        accessToken
+    );
 
     const accessTokenCriptografado =
         criptografarTexto(
@@ -265,16 +431,19 @@ export async function concluirIntegracaoWhatsApp({
         );
 
     return {
-        wabaId,
-        phoneNumberId,
+        wabaId:
+            wabaIdFinal,
+
+        phoneNumberId:
+            numeroSelecionado.id,
 
         numeroExibicao:
-            dadosNumero
+            numeroSelecionado
                 .display_phone_number ??
             null,
 
         nomeVerificado:
-            dadosNumero
+            numeroSelecionado
                 .verified_name ??
             null,
 

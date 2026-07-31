@@ -10,7 +10,7 @@ import {
     auth,
 } from "../middleware/auth";
 
-import {concluirIntegracaoWhatsApp,} from "../service/integracaoWhatsapp";
+import { concluirIntegracaoWhatsApp, } from "../service/integracaoWhatsapp";
 const integracaoWhatsAppRoutes =
     Router();
 
@@ -104,18 +104,38 @@ integracaoWhatsAppRoutes.post(
             } = req.body;
 
             if (
-                typeof code !==
-                    "string" ||
-                typeof wabaId !==
-                    "string" ||
-                typeof phoneNumberId !==
-                    "string"
+                typeof code !== "string" ||
+                !code.trim()
             ) {
                 return res
                     .status(400)
                     .json({
                         erro:
-                            "Code, WABA ID e Phone Number ID são obrigatórios",
+                            "O código de autorização é obrigatório",
+                    });
+            }
+
+            if (
+                wabaId !== undefined &&
+                typeof wabaId !== "string"
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        erro:
+                            "WABA ID inválido",
+                    });
+            }
+
+            if (
+                phoneNumberId !== undefined &&
+                typeof phoneNumberId !== "string"
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        erro:
+                            "Phone Number ID inválido",
                     });
             }
 
@@ -149,12 +169,21 @@ integracaoWhatsAppRoutes.post(
             const dadosIntegracao =
                 await concluirIntegracaoWhatsApp({
                     empresaId,
+
                     code:
                         code.trim(),
+
                     wabaId:
-                        wabaId.trim(),
+                        typeof wabaId === "string" &&
+                            wabaId.trim()
+                            ? wabaId.trim()
+                            : undefined,
+
                     phoneNumberId:
-                        phoneNumberId.trim(),
+                        typeof phoneNumberId === "string" &&
+                            phoneNumberId.trim()
+                            ? phoneNumberId.trim()
+                            : undefined,
                 });
 
             const integracao =
