@@ -82,9 +82,6 @@ function obterConfiguracaoMeta() {
         process.env.META_GRAPH_API_VERSION ??
         "v24.0";
 
-    const redirectUri =
-        process.env.META_REDIRECT_URI;
-
     if (!appId) {
         throw new Error(
             "META_APP_ID não configurado"
@@ -97,17 +94,10 @@ function obterConfiguracaoMeta() {
         );
     }
 
-    if (!redirectUri) {
-        throw new Error(
-            "META_REDIRECT_URI não configurada"
-        );
-    }
-
     return {
         appId,
         appSecret,
         versaoGraph,
-        redirectUri,
     };
 }
 
