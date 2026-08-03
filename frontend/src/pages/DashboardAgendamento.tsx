@@ -1,179 +1,181 @@
-import { useEffect, useState } from "react";
+import {
+    useEffect,
+    useState,
+} from "react";
+
+import CalendarioAgendamentos from
+    "../components/agendamentos/CalendarioAgendamentos";
+import { ListaServicos } from "../components/ListarServicos";
+import { FormularioServico } from "../components/FormularioServico";
 
 import type {
     Agendamento,
-    NovoAgendamento
+    NovoAgendamento,
 } from "../types/Agendamento";
 
-import type { Cliente } from "../types/Cliente";
-import type { Servico } from "../types/Servico";
+import type {
+    Cliente,
+} from "../types/Cliente";
 
-import { api } from "../services/api";
+import type {
+    HorarioFuncionamento,
+} from "../types/HorarioFuncionamento";
 
-import { FormularioAgendamento } from "../components/FormularioAgendamento";
-import { ListarAgendamentos } from "../components/ListarAgendamentos";
+import type {
+    Servico,NovoServico
+} from "../types/Servico";
 
+import {
+    api,
+} from "../services/api";
 
 export function DashboardAgendamento() {
-
-    const [clientes, setClientes] =
-        useState<Cliente[]>([]);
-
-    const [servicos, setServicos] =
-        useState<Servico[]>([]);
-
-    const [agendamentos, setAgendamentos] =
-        useState<Agendamento[]>([]);
+    const [
+        clientes,
+        setClientes,
+    ] = useState<Cliente[]>([]);
 
     const [
-        agendamentoEditando,
-        setAgendamentoEditando
-    ] = useState<Agendamento | null>(null);
+        servicos,
+        setServicos,
+    ] = useState<Servico[]>([]);
+     const [
+        servicoEditando,
+        setServicoEditando
+    ] = useState<Servico | null>(null);
 
-    const [mensagem, setMensagem] =
-        useState<string>("");
 
+    const [
+        horarios,
+        setHorarios,
+    ] =
+        useState<
+            HorarioFuncionamento[]
+        >([]);
 
+    const [
+        agendamentos,
+        setAgendamentos,
+    ] = useState<Agendamento[]>(
+        []
+    );
+
+    const [
+        mensagem,
+        setMensagem,
+    ] = useState("");
+
+    function obterToken() {
+        return localStorage.getItem(
+            "token"
+        );
+    }
+
+    function obterHeaders() {
+        return {
+            Authorization:
+                `Bearer ${obterToken()}`,
+        };
+    }
+    
     async function buscarClientes() {
-
-        const token =
-            localStorage.getItem("token");
-
         try {
-
-            const resposta = await api.get(
-                "empresa/clientes",
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
+            const resposta =
+                await api.get(
+                    "empresa/clientes",
+                    {
+                        headers:
+                            obterHeaders(),
                     }
-                }
+                );
+
+            setClientes(
+                resposta.data
             );
-
-            setClientes(resposta.data);
-
         } catch (erro) {
-
             console.error(
                 "Erro ao buscar clientes:",
                 erro
             );
-
         }
-
     }
 
-
     async function buscarServicos() {
-
-        const token =
-            localStorage.getItem("token");
-
         try {
-
-            const resposta = await api.get(
-                "empresa/servicos",
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
+            const resposta =
+                await api.get(
+                    "empresa/servicos",
+                    {
+                        headers:
+                            obterHeaders(),
                     }
-                }
+                );
+
+            setServicos(
+                resposta.data
             );
-
-            setServicos(resposta.data);
-
         } catch (erro) {
-
             console.error(
                 "Erro ao buscar serviços:",
                 erro
             );
-
         }
-
     }
 
+    async function buscarHorarios() {
+        try {
+            const resposta =
+                await api.get(
+                    "empresa/horarios",
+                    {
+                        headers:
+                            obterHeaders(),
+                    }
+                );
+
+            setHorarios(
+                resposta.data
+            );
+        } catch (erro) {
+            console.error(
+                "Erro ao buscar horários:",
+                erro
+            );
+        }
+    }
 
     async function buscarAgendamentos() {
-
-        const token =
-            localStorage.getItem("token");
-
         try {
-
-            const resposta = await api.get(
-                "empresa/agendamentos",
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
+            const resposta =
+                await api.get(
+                    "empresa/agendamentos",
+                    {
+                        headers:
+                            obterHeaders(),
                     }
-                }
+                );
+
+            setAgendamentos(
+                resposta.data
             );
-
-            setAgendamentos(resposta.data);
-
         } catch (erro) {
-
             console.error(
                 "Erro ao buscar agendamentos:",
                 erro
             );
-
         }
-
     }
-
-
-    useEffect(() => {
-
-        buscarClientes();
-        buscarServicos();
-        buscarAgendamentos();
-
-    }, []);
-
-
-    function selecionarAgendamentoParaEdicao(
-        agendamento: Agendamento
-    ) {
-
-        if (agendamento.status !== "AGENDADO") {
-
-            setMensagem(
-                "Somente agendamentos confirmados podem ser editados"
-            );
-
-            return;
-
-        }
-
-        setAgendamentoEditando(agendamento);
-        setMensagem("");
-
-    }
-
-
-    async function salvarAgendamento(
-        dados: NovoAgendamento
-    ) {
-
-        const token =
-            localStorage.getItem("token");
-
-
-        if (agendamentoEditando) {
-
+    async function excluirServico(
+            id: number
+        ) {
+    
+            const token =
+                localStorage.getItem("token");
+    
             try {
-
-                await api.put(
-                    `empresa/agendamentos/${agendamentoEditando.id}`,
-                    {
-                        datahoraInicio:
-                            dados.datahoraInicio
-                    },
+    
+                await api.delete(
+                    `empresa/servicos/${id}`,
                     {
                         headers: {
                             Authorization:
@@ -181,196 +183,243 @@ export function DashboardAgendamento() {
                         }
                     }
                 );
-
+    
+                if (
+                    servicoEditando?.id === id
+                ) {
+                    setServicoEditando(null);
+                }
+    
                 setMensagem(
-                    "Agendamento atualizado com sucesso"
+                    "Serviço excluído com sucesso"
                 );
-
-                setAgendamentoEditando(null);
-
-                await buscarAgendamentos();
-
+    
+                await buscarServicos();
+    
             } catch (erro: any) {
-
+    
                 console.error(
-                    "Erro ao editar agendamento:",
+                    "Erro ao excluir serviço:",
                     erro
                 );
-
-                if (erro.response) {
-
-                    setMensagem(
-                        erro.response.data.erro ||
-                        "Erro ao editar agendamento"
-                    );
-
-                } else {
-
-                    setMensagem(
-                        "Erro ao conectar com o servidor"
-                    );
-
-                }
-
+    
+                setMensagem(
+                    erro.response?.data?.erro ??
+                    "Erro ao excluir serviço"
+                );
+    
             }
-
-            return;
-
+    
+        }
+    
+    
+        function editarServico(
+            servico: Servico
+        ) {
+    
+            setServicoEditando(servico);
+            setMensagem("");
+    
+        }
+    
+    
+        function cancelarEdicao() {
+    
+            setServicoEditando(null);
+            setMensagem("");
+    
+        }
+    
+    
+        async function salvarServico(
+            dados: NovoServico
+        ) {
+    
+            const token =
+                localStorage.getItem("token");
+    
+            try {
+    
+                if (servicoEditando) {
+    
+                    await api.put(
+                        `empresa/servicos/${servicoEditando.id}`,
+                        dados,
+                        {
+                            headers: {
+                                Authorization:
+                                    `Bearer ${token}`
+                            }
+                        }
+                    );
+    
+                    setMensagem(
+                        "Serviço atualizado com sucesso"
+                    );
+    
+                } else {
+    
+                    await api.post(
+                        "empresa/servicos",
+                        dados,
+                        {
+                            headers: {
+                                Authorization:
+                                    `Bearer ${token}`
+                            }
+                        }
+                    );
+    
+                    setMensagem(
+                        "Serviço cadastrado com sucesso"
+                    );
+    
+                }
+    
+                setServicoEditando(null);
+    
+                await buscarServicos();
+    
+            } catch (erro: any) {
+    
+                console.error(
+                    "Erro ao salvar serviço:",
+                    erro
+                );
+    
+                setMensagem(
+                    erro.response?.data?.erro ??
+                    "Erro ao salvar serviço"
+                );
+    
+            }
+    
         }
 
+    useEffect(() => {
+        void Promise.all([
+            buscarClientes(),
+            buscarServicos(),
+            buscarHorarios(),
+            buscarAgendamentos(),
+        ]);
+    }, []);
 
+    async function salvarNovoAgendamento(
+        dados: NovoAgendamento
+    ) {
         try {
-
             await api.post(
                 "empresa/agendamentos",
                 dados,
                 {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
+                    headers:
+                        obterHeaders(),
                 }
             );
 
             setMensagem(
-                "Agendamento criado com sucesso"
+                "Agendamento criado com sucesso."
             );
-
-            setAgendamentoEditando(null);
 
             await buscarAgendamentos();
 
+            return true;
         } catch (erro: any) {
-
             console.error(
                 "Erro ao criar agendamento:",
                 erro
             );
 
-            if (erro.response) {
+            setMensagem(
+                erro.response?.data
+                    ?.erro ??
+                "Erro ao criar agendamento."
+            );
 
-                setMensagem(
-                    erro.response.data.erro ||
-                    "Erro ao criar agendamento"
-                );
-
-            } else {
-
-                setMensagem(
-                    "Erro ao conectar com o servidor"
-                );
-
-            }
-
+            return false;
         }
-
     }
 
-
-    async function cancelarAgendamento(
-        id: number
+    async function editarAgendamento(
+        id: number,
+        dados: NovoAgendamento
     ) {
-
-        const token =
-            localStorage.getItem("token");
-
         try {
-
-            await api.patch(
-                `empresa/agendamentos/${id}/cancelar`,
-                {},
+            await api.put(
+                `empresa/agendamentos/${id}`,
                 {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
+                    datahoraInicio:
+                        dados.datahoraInicio,
+                },
+                {
+                    headers:
+                        obterHeaders(),
                 }
             );
 
             setMensagem(
-                "Agendamento cancelado com sucesso"
+                "Agendamento atualizado com sucesso."
             );
-
-            if (
-                agendamentoEditando?.id === id
-            ) {
-
-                setAgendamentoEditando(null);
-
-            }
 
             await buscarAgendamentos();
 
+            return true;
         } catch (erro: any) {
+            console.error(
+                "Erro ao editar agendamento:",
+                erro
+            );
 
+            setMensagem(
+                erro.response?.data
+                    ?.erro ??
+                "Erro ao editar agendamento."
+            );
+
+            return false;
+        }
+    }
+
+    async function cancelarAgendamento(
+        id: number
+    ) {
+        try {
+            await api.patch(
+                `empresa/agendamentos/${id}/cancelar`,
+                {},
+                {
+                    headers:
+                        obterHeaders(),
+                }
+            );
+
+            setMensagem(
+                "Agendamento cancelado com sucesso."
+            );
+
+            await buscarAgendamentos();
+
+            return true;
+        } catch (erro: any) {
             console.error(
                 "Erro ao cancelar agendamento:",
                 erro
             );
 
-            if (erro.response) {
+            setMensagem(
+                erro.response?.data
+                    ?.erro ??
+                "Erro ao cancelar agendamento."
+            );
 
-                setMensagem(
-                    erro.response.data.erro ||
-                    "Erro ao cancelar agendamento"
-                );
-
-            } else {
-
-                setMensagem(
-                    "Erro ao conectar com o servidor"
-                );
-
-            }
-
+            return false;
         }
-
     }
-
-
-    function cancelarEdicao() {
-
-        setAgendamentoEditando(null);
-        setMensagem("");
-
-    }
-
 
     return (
-
-        <div>
-
-            <FormularioAgendamento
-                agendamento={
-                    agendamentoEditando
-                }
-                clientes={
-                    clientes
-                }
-                servicos={
-                    servicos
-                }
-                onSalvar={
-                    salvarAgendamento
-                }
-            />
-
-
-            {agendamentoEditando && (
-
-                <button
-                    type="button"
-                    onClick={
-                        cancelarEdicao
-                    }
-                >
-                    Cancelar edição
-                </button>
-
-            )}
-
-
-            <ListarAgendamentos
+        <main className="dashboard-agendamento">
+            <CalendarioAgendamentos
                 agendamentos={
                     agendamentos
                 }
@@ -380,25 +429,58 @@ export function DashboardAgendamento() {
                 servicos={
                     servicos
                 }
-                aoEditar={
-                    selecionarAgendamentoParaEdicao
+                horarios={
+                    horarios
                 }
-                aoCancelar={
+                aoSalvarNovoAgendamento={
+                    salvarNovoAgendamento
+                }
+                aoEditarAgendamento={
+                    editarAgendamento
+                }
+                aoCancelarAgendamento={
                     cancelarAgendamento
                 }
             />
 
-
             {mensagem && (
-
-                <p>
+                <p className="dashboard-agendamento__mensagem">
                     {mensagem}
                 </p>
-
             )}
-
-        </div>
-
+            <div>
+             <FormularioServico
+                            servico={servicoEditando}
+                            onSalvar={salvarServico}
+                        />
+            
+            
+                        {servicoEditando && (
+                            <button
+                                type="button"
+                                onClick={cancelarEdicao}
+                            >
+                                Cancelar edição
+                            </button>
+                        )}
+            
+            
+                        <ListaServicos
+                            servicos={servicos}
+                            aoExcluir={excluirServico}
+                            aoEditar={editarServico}
+                        />
+            
+            
+                        {mensagem && (
+                            <p>
+                                {mensagem}
+                            </p>
+                        )}
+            
+                    </div>
+        </main>
+        
+        
     );
-
 }

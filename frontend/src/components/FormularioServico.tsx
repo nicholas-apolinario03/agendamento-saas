@@ -314,10 +314,7 @@ export function FormularioServico({
     return (
         <form onSubmit={enviarFormulario}>
 
-            <div>
-                <label>
-                    Nome
-                </label>
+           
 
                 <input
                     type="text"
@@ -330,13 +327,10 @@ export function FormularioServico({
                     }
                     required
                 />
-            </div>
+           
 
 
-            <div>
-                <label>
-                    Duração em minutos
-                </label>
+           
 
                 <input
                     type="number"
@@ -352,14 +346,9 @@ export function FormularioServico({
                     }
                     required
                 />
-            </div>
+           
 
-
-            <div>
-                <label>
-                    Descrição
-                </label>
-
+            
                 <input
                     type="text"
                     placeholder="Descrição"
@@ -370,14 +359,10 @@ export function FormularioServico({
                         )
                     }
                 />
-            </div>
+           
 
 
-            <div>
-                <label>
-                    Preço
-                </label>
-
+            
                 <input
                     type="number"
                     min={0}
@@ -393,8 +378,7 @@ export function FormularioServico({
                     }
                     required
                 />
-            </div>
-
+           
 
             <div>
                 <label>
@@ -414,9 +398,7 @@ export function FormularioServico({
 
 
             <div>
-                <label>
-                    Disponibilidade
-                </label>
+                
 
                 <select
                     value={

@@ -1,5 +1,5 @@
 export type StatusAgendamento =
-    | "AGUARDANDO_CONFIRMACAO"
+    | "AGUARDANDO"
     | "AGENDADO"
     | "CANCELADO"
     | "CONCLUIDO";

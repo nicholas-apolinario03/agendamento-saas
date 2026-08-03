@@ -808,231 +808,331 @@ app.get("/empresa/clientes", auth, async (req, res) => {
 
 
 
-function criarDataComHorario(
-    data: Date,
-    horario: string
+const FUSO_AGENDA = "America/Sao_Paulo";
+const OFFSET_SAO_PAULO = "-03:00";
+
+function converterDatahoraRecebidaParaUtc(
+    valor: unknown
 ) {
-    const resultado = new Date(data);
+    if (
+        typeof valor !== "string" ||
+        !valor.trim()
+    ) {
+        return null;
+    }
 
-    const [hora, minuto] = horario.split(":");
+    const datahora = valor.trim();
 
-    resultado.setHours(
-        Number(hora),
-        Number(minuto),
-        0,
-        0
+    const possuiFuso =
+        /(?:Z|[+-]\d{2}:\d{2})$/i.test(
+            datahora
+        );
+
+    const valorNormalizado =
+        possuiFuso
+            ? datahora
+            : `${
+                datahora.length === 16
+                    ? `${datahora}:00`
+                    : datahora
+            }${OFFSET_SAO_PAULO}`;
+
+    const data = new Date(
+        valorNormalizado
     );
 
-    return resultado;
+    if (
+        Number.isNaN(
+            data.getTime()
+        )
+    ) {
+        return null;
+    }
+
+    return data;
 }
 
+function obterPartesDataSaoPaulo(
+    data: Date
+) {
+    const formatador =
+        new Intl.DateTimeFormat(
+            "en-US",
+            {
+                timeZone:
+                    FUSO_AGENDA,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+                weekday: "short",
+            }
+        );
+
+    const partes =
+        Object.fromEntries(
+            formatador
+                .formatToParts(data)
+                .filter(
+                    (parte) =>
+                        parte.type !==
+                        "literal"
+                )
+                .map(
+                    (parte) => [
+                        parte.type,
+                        parte.value,
+                    ]
+                )
+        ) as Record<string, string>;
+
+    const diasSemana: Record<
+        string,
+        number
+    > = {
+        Sun: 0,
+        Mon: 1,
+        Tue: 2,
+        Wed: 3,
+        Thu: 4,
+        Fri: 5,
+        Sat: 6,
+    };
+
+    return {
+        ano: Number(partes.year),
+        mes: Number(partes.month),
+        dia: Number(partes.day),
+        hora: Number(partes.hour),
+        minuto: Number(partes.minute),
+        diaSemana:
+            diasSemana[
+                partes.weekday
+            ],
+    };
+}
+
+function horarioParaMinutos(
+    horario: string
+) {
+    const [hora, minuto] =
+        horario
+            .substring(0, 5)
+            .split(":")
+            .map(Number);
+
+    return (
+        hora * 60 +
+        minuto
+    );
+}
 
 app.post("/empresa/agendamentos", auth, async (req, res) => {
 
     try {
-
         const {
             clienteId,
             servicoId,
-            datahoraInicio
+            datahoraInicio,
         } = req.body;
 
         const empresaId =
             (req as any).usuario.empresaId;
 
-
-        // 1. Verificar cliente
-
         const cliente =
             await prisma.cliente.findFirst({
                 where: {
                     id: clienteId,
-                    empresaId
-                }
+                    empresaId,
+                },
             });
 
         if (!cliente) {
             return res.status(404).json({
-                erro: "Cliente não encontrado"
+                erro: "Cliente não encontrado",
             });
         }
-
-
-        // 2. Verificar serviço
 
         const servico =
             await prisma.servico.findFirst({
                 where: {
                     id: servicoId,
-                    empresaId
-                }
+                    empresaId,
+                },
             });
 
         if (!servico) {
             return res.status(404).json({
-                erro: "Serviço não encontrado"
+                erro: "Serviço não encontrado",
             });
         }
 
-
-        // 3. Calcular horário final
-
         const inicio =
-            new Date(datahoraInicio);
-
-        const fim =
-            new Date(
-                inicio.getTime() +
-                servico.duracaoMinutos *
-                60 *
-                1000
+            converterDatahoraRecebidaParaUtc(
+                datahoraInicio
             );
 
+        if (!inicio) {
+            return res.status(400).json({
+                erro: "Data e horário inválidos",
+            });
+        }
 
-        // 4. Descobrir o dia da semana
+        const fim = new Date(
+            inicio.getTime() +
+            servico.duracaoMinutos *
+            60 *
+            1000
+        );
 
-        const diaSemana =
-            inicio.getDay();
+        const partesInicio =
+            obterPartesDataSaoPaulo(
+                inicio
+            );
 
+        const inicioMinutos =
+            partesInicio.hora * 60 +
+            partesInicio.minuto;
 
-        // 5. Buscar horários de funcionamento
+        const fimMinutos =
+            inicioMinutos +
+            servico.duracaoMinutos;
 
         const horariosFuncionamento =
             await prisma.horarioFuncionamento.findMany({
                 where: {
                     empresaId,
-                    diaSemana,
-                    ativo: true
-                }
+                    diaSemana:
+                        partesInicio.diaSemana,
+                    ativo: true,
+                },
             });
-
-
-        // 6. Verificar se o agendamento
-        // cabe em algum intervalo
 
         const dentroDoHorario =
-            horariosFuncionamento.some((horario) => {
+            horariosFuncionamento.some(
+                (horario) => {
+                    const abertura =
+                        horarioParaMinutos(
+                            horario.horaInicio
+                        );
 
-                const inicioFuncionamento =
-                    criarDataComHorario(
-                        inicio,
-                        horario.horaInicio
+                    const fechamento =
+                        horarioParaMinutos(
+                            horario.horaFim
+                        );
+
+                    return (
+                        inicioMinutos >=
+                            abertura &&
+                        fimMinutos <=
+                            fechamento
                     );
-
-                const fimFuncionamento =
-                    criarDataComHorario(
-                        inicio,
-                        horario.horaFim
-                    );
-
-                return (
-                    inicio >= inicioFuncionamento &&
-                    fim <= fimFuncionamento
-                );
-
-            });
-
+                }
+            );
 
         if (!dentroDoHorario) {
             return res.status(400).json({
-                erro: "O horário escolhido está fora do horário de funcionamento"
+                erro: "O horário escolhido está fora do horário de funcionamento",
             });
         }
-
-
-        // 7. Verificar conflito
 
         const conflito =
             await prisma.agendamento.findFirst({
                 where: {
-
                     empresaId,
-
                     status: {
                         in: [
                             "AGUARDANDO_CONFIRMACAO",
-                            "AGENDADO"
-                        ]
+                            "AGENDADO",
+                        ],
                     },
-
                     datahoraInicio: {
-                        lt: fim
+                        lt: fim,
                     },
-
                     datahoraFim: {
-                        gt: inicio
-                    }
-
-                }
+                        gt: inicio,
+                    },
+                },
             });
-
 
         if (conflito) {
             return res.status(409).json({
-                erro: "Horário já está ocupado"
+                erro: "Horário já está ocupado",
             });
         }
-
-
-        // 8. Criar agendamento
 
         const agendamento =
             await prisma.agendamento.create({
                 data: {
-
                     empresaId,
-
                     clienteId,
-
                     servicoId,
-
-                    datahoraInicio: inicio,
-
-                    datahoraFim: fim,
-
-                    status: "AGENDADO"
-
-                }
+                    datahoraInicio:
+                        inicio,
+                    datahoraFim:
+                        fim,
+                    status: "AGENDADO",
+                },
             });
 
-
-        return res.status(201).json(
-            agendamento
-        );
-
+        return res.status(201).json({
+            ...agendamento,
+            datahoraInicio:
+                agendamento.datahoraInicio.toISOString(),
+            datahoraFim:
+                agendamento.datahoraFim.toISOString(),
+        });
 
     } catch (erro) {
-
         console.error(
             "Erro ao criar agendamento:",
             erro
         );
 
         return res.status(500).json({
-            erro: "Erro ao criar agendamento"
+            erro: "Erro ao criar agendamento",
         });
-
     }
-
 });
 
 
 app.get("/empresa/agendamentos", auth, async (req, res) => {
     try {
-        const empresaId = (req as any).usuario.empresaId;
-        const agendamento = await prisma.agendamento.findMany({
-            where: {
-                empresaId
-            }
-        });
-        return res.json(agendamento);
+        const empresaId =
+            (req as any).usuario.empresaId;
+
+        const agendamentos =
+            await prisma.agendamento.findMany({
+                where: {
+                    empresaId,
+                },
+                orderBy: {
+                    datahoraInicio: "asc",
+                },
+            });
+
+        return res.json(
+            agendamentos.map(
+                (agendamento) => ({
+                    ...agendamento,
+                    datahoraInicio:
+                        agendamento.datahoraInicio.toISOString(),
+                    datahoraFim:
+                        agendamento.datahoraFim.toISOString(),
+                })
+            )
+        );
     } catch (erro) {
         console.error(erro);
+
         return res.status(500).json({
-            erro: "Erro ao buscar agendamentos"
-        })
+            erro: "Erro ao buscar agendamentos",
+        });
     }
-})
+});
+
 
 //cancelar agendamento
 app.patch(
@@ -1103,173 +1203,168 @@ app.put(
             const empresaId =
                 (req as any).usuario.empresaId;
 
-            const id = Number(req.params.id);
+            const id =
+                Number(req.params.id);
 
             const {
-                datahoraInicio
+                datahoraInicio,
             } = req.body;
 
             if (Number.isNaN(id)) {
                 return res.status(400).json({
-                    erro: "ID do agendamento inválido"
+                    erro: "ID do agendamento inválido",
                 });
             }
 
             if (!datahoraInicio) {
                 return res.status(400).json({
-                    erro: "Informe a nova data e horário"
+                    erro: "Informe a nova data e horário",
                 });
             }
-
-
-            // 1. Buscar agendamento
 
             const agendamento =
                 await prisma.agendamento.findFirst({
                     where: {
                         id,
-                        empresaId
+                        empresaId,
                     },
                     include: {
-                        servico: true
-                    }
+                        servico: true,
+                    },
                 });
 
             if (!agendamento) {
                 return res.status(404).json({
-                    erro: "Agendamento não encontrado"
+                    erro: "Agendamento não encontrado",
                 });
             }
 
-
-            // 2. Permitir edição apenas de AGENDADO
-
-            if (agendamento.status !== "AGENDADO") {
+            if (
+                agendamento.status !==
+                "AGENDADO"
+            ) {
                 return res.status(400).json({
-                    erro: "Somente agendamentos confirmados podem ser editados"
+                    erro: "Somente agendamentos confirmados podem ser editados",
                 });
             }
-
-
-            // 3. Criar nova data de início
 
             const inicio =
-                new Date(datahoraInicio);
+                converterDatahoraRecebidaParaUtc(
+                    datahoraInicio
+                );
 
-            if (Number.isNaN(inicio.getTime())) {
+            if (!inicio) {
                 return res.status(400).json({
-                    erro: "Data e horário inválidos"
+                    erro: "Data e horário inválidos",
                 });
             }
 
+            const fim = new Date(
+                inicio.getTime() +
+                agendamento.servico.duracaoMinutos *
+                60 *
+                1000
+            );
 
-            // 4. Calcular novo horário final
-
-            const fim =
-                new Date(
-                    inicio.getTime() +
-                    agendamento.servico.duracaoMinutos *
-                    60 *
-                    1000
+            const partesInicio =
+                obterPartesDataSaoPaulo(
+                    inicio
                 );
 
+            const inicioMinutos =
+                partesInicio.hora * 60 +
+                partesInicio.minuto;
 
-            // 5. Buscar horários de funcionamento
-
-            const diaSemana =
-                inicio.getDay();
+            const fimMinutos =
+                inicioMinutos +
+                agendamento.servico.duracaoMinutos;
 
             const horariosFuncionamento =
                 await prisma.horarioFuncionamento.findMany({
                     where: {
                         empresaId,
-                        diaSemana,
-                        ativo: true
-                    }
+                        diaSemana:
+                            partesInicio.diaSemana,
+                        ativo: true,
+                    },
                 });
-
-
-            // 6. Verificar se cabe no funcionamento
 
             const dentroDoHorario =
-                horariosFuncionamento.some((horario) => {
+                horariosFuncionamento.some(
+                    (horario) => {
+                        const abertura =
+                            horarioParaMinutos(
+                                horario.horaInicio
+                            );
 
-                    const inicioFuncionamento =
-                        criarDataComHorario(
-                            inicio,
-                            horario.horaInicio
+                        const fechamento =
+                            horarioParaMinutos(
+                                horario.horaFim
+                            );
+
+                        return (
+                            inicioMinutos >=
+                                abertura &&
+                            fimMinutos <=
+                                fechamento
                         );
-
-                    const fimFuncionamento =
-                        criarDataComHorario(
-                            inicio,
-                            horario.horaFim
-                        );
-
-                    return (
-                        inicio >= inicioFuncionamento &&
-                        fim <= fimFuncionamento
-                    );
-                });
+                    }
+                );
 
             if (!dentroDoHorario) {
                 return res.status(400).json({
-                    erro: "O novo horário está fora do horário de funcionamento"
+                    erro: "O novo horário está fora do horário de funcionamento",
                 });
             }
-
-
-            // 7. Verificar conflito
 
             const conflito =
                 await prisma.agendamento.findFirst({
                     where: {
                         empresaId,
-
                         id: {
-                            not: id
+                            not: id,
                         },
-
                         status: {
                             in: [
                                 "AGUARDANDO_CONFIRMACAO",
-                                "AGENDADO"
-                            ]
+                                "AGENDADO",
+                            ],
                         },
-
                         datahoraInicio: {
-                            lt: fim
+                            lt: fim,
                         },
-
                         datahoraFim: {
-                            gt: inicio
-                        }
-                    }
+                            gt: inicio,
+                        },
+                    },
                 });
 
             if (conflito) {
                 return res.status(409).json({
-                    erro: "O novo horário já está ocupado"
+                    erro: "O novo horário já está ocupado",
                 });
             }
-
-
-            // 8. Atualizar agendamento
 
             const agendamentoAtualizado =
                 await prisma.agendamento.update({
                     where: {
-                        id
+                        id,
                     },
                     data: {
-                        datahoraInicio: inicio,
-                        datahoraFim: fim
-                    }
+                        datahoraInicio:
+                            inicio,
+                        datahoraFim:
+                            fim,
+                    },
                 });
 
-            return res.status(200).json(
-                agendamentoAtualizado
-            );
+            return res.status(200).json({
+                ...agendamentoAtualizado,
+                datahoraInicio:
+                    agendamentoAtualizado.datahoraInicio.toISOString(),
+                datahoraFim:
+                    agendamentoAtualizado.datahoraFim.toISOString(),
+            });
 
         } catch (erro) {
             console.error(
@@ -1278,11 +1373,12 @@ app.put(
             );
 
             return res.status(500).json({
-                erro: "Erro ao editar agendamento"
+                erro: "Erro ao editar agendamento",
             });
         }
     }
 );
+
 
 import {
     enviarMensagemWhatsApp

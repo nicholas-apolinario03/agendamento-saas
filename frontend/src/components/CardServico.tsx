@@ -36,28 +36,27 @@ export function CardServico({
 
             <p>
                 Duração: {servico.duracaoMinutos} minutos
-            </p>
 
-            <p>
+
                 Descrição: {servico.descricao || "Sem descrição"}
-            </p>
 
-            <p>
+
+
                 Preço:{" "}
                 {servico.preco.toLocaleString("pt-BR", {
                     style: "currency",
                     currency: "BRL",
                 })}
-            </p>
 
-            <p>
+
+
                 Status: {servico.ativo ? "Ativo" : "Inativo"}
-            </p>
 
-            <p>
+
+
                 Disponibilidade: {disponibilidade}
-            </p>
 
+            </p>
             {servico.excecoes.length > 0 && (
                 <div>
                     <p>Exceções:</p>

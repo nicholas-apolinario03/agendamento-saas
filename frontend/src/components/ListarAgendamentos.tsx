@@ -85,7 +85,7 @@ export function ListarAgendamentos({
                     const podeCancelar =
                         agendamento.status === "AGENDADO" ||
                         agendamento.status ===
-                            "AGUARDANDO_CONFIRMACAO";
+                            "AGUARDANDO";
 
                     return (
                         <div key={agendamento.id}>

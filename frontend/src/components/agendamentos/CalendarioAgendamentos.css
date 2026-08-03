@@ -1,0 +1,672 @@
+.calendario-agendamentos {
+    width: 100%;
+    padding: 24px;
+    box-sizing: border-box;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    background: #ffffff;
+}
+
+.calendario-agendamentos__cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.calendario-agendamentos__cabecalho h2 {
+    margin: 0 0 8px;
+    color: #111827;
+}
+
+.calendario-agendamentos__cabecalho p {
+    margin: 0;
+    color: #667085;
+}
+
+.calendario-agendamentos__legenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+}
+
+.calendario-agendamentos__legenda > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #667085;
+    font-size: 14px;
+}
+
+.status {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+
+.status--aguardando {
+    background-color: #f4b942;
+}
+
+.status--agendado {
+    background-color: #69bde7;
+}
+
+.status--cancelado {
+    background-color: #eb6666;
+}
+
+.status--concluido {
+    background-color: #59bf7c;
+}
+
+.calendario-agendamentos .rdp-root,
+.calendario-agendamentos .rdp-months,
+.calendario-agendamentos .rdp-month {
+    width: 100%;
+    max-width: none;
+}
+
+.calendario-agendamentos .rdp-month_grid {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 8px;
+}
+
+.calendario-agendamentos .rdp-month_caption {
+    margin-bottom: 16px;
+}
+
+.calendario-agendamentos .rdp-caption_label {
+    color: #111827;
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.calendario-agendamentos .rdp-weekday {
+    padding: 10px 4px;
+    color: #667085;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    text-transform: capitalize;
+}
+
+.calendario-agendamentos .rdp-day {
+    width: calc(100% / 7);
+    height: 145px;
+    padding: 0;
+    vertical-align: top;
+}
+
+.calendario-agendamentos
+.rdp-day_button.calendario-dia {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+
+    width: 100%;
+    height: 100%;
+    padding: 12px;
+
+    color: #111827;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #ffffff;
+
+    box-sizing: border-box;
+    cursor: pointer;
+
+    transition:
+        border-color 0.2s ease,
+        background-color 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.calendario-agendamentos
+.rdp-day_button.calendario-dia:hover {
+    border-color: #9ca3af;
+    background: #f9fafb;
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 18px
+        rgba(15, 23, 42, 0.08);
+}
+
+.calendario-dia__numero {
+    color: #111827;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.calendario-dia__agendamentos {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+}
+
+.calendario-agendamento {
+    display: grid;
+    grid-template-columns:
+        8px
+        auto
+        minmax(0, 1fr);
+
+    align-items: center;
+    gap: 6px;
+
+    width: 100%;
+    min-width: 0;
+
+    color: #344054;
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.calendario-agendamento strong {
+    color: #344054;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.calendario-agendamento > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendario-agendamento__status {
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.calendario-agendamento--aguardando
+.calendario-agendamento__status {
+    background-color: #f4b942;
+}
+
+.calendario-agendamento--agendado
+.calendario-agendamento__status {
+    background-color: #69bde7;
+}
+
+.calendario-agendamento--cancelado
+.calendario-agendamento__status {
+    background-color: #eb6666;
+}
+
+.calendario-agendamento--concluido
+.calendario-agendamento__status {
+    background-color: #59bf7c;
+}
+
+.calendario-dia__restantes {
+    margin-top: 2px;
+    color: #667085;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.calendario-agendamentos
+.rdp-day_button.calendario-dia--hoje {
+    border: 2px solid #111827;
+}
+
+.calendario-agendamentos
+.rdp-day_button.calendario-dia--fora {
+    opacity: 0.3;
+}
+
+.calendario-agendamentos
+.rdp-selected
+.rdp-day_button.calendario-dia {
+    color: #111827;
+    border-color: #111827;
+    background: #f9fafb;
+}
+
+@media (max-width: 900px) {
+    .calendario-agendamentos__cabecalho {
+        flex-direction: column;
+    }
+
+    .calendario-agendamentos .rdp-day {
+        height: 130px;
+    }
+}
+
+@media (max-width: 640px) {
+    .calendario-agendamentos {
+        padding: 14px;
+        overflow-x: auto;
+    }
+
+    .calendario-agendamentos .rdp-month_grid {
+        min-width: 820px;
+    }
+}
+.painel-dia {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 1000;
+
+    display: flex;
+    flex-direction: column;
+
+    width: min(420px, 100%);
+    height: 100vh;
+
+    background: #ffffff;
+    border-left: 1px solid #e5e7eb;
+    box-shadow:
+        -12px 0 30px
+        rgba(15, 23, 42, 0.12);
+}
+
+.painel-dia__cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+
+    padding: 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.painel-dia__cabecalho span {
+    color: #667085;
+    font-size: 13px;
+}
+
+.painel-dia__cabecalho h3 {
+    margin: 6px 0 0;
+    color: #111827;
+    font-size: 20px;
+    text-transform: capitalize;
+}
+
+.painel-dia__fechar {
+    width: 36px;
+    height: 36px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+
+    color: #111827;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.painel-dia__conteudo {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+
+    padding: 20px 24px;
+    overflow-y: auto;
+}
+
+.painel-agendamento {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 14px;
+
+    padding: 16px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+.painel-agendamento__horario {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.painel-agendamento__informacoes {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.painel-agendamento__informacoes strong {
+    color: #111827;
+    font-size: 14px;
+}
+
+.painel-agendamento__informacoes > span {
+    color: #667085;
+    font-size: 13px;
+}
+
+.painel-agendamento__status {
+    display: inline-flex;
+    align-self: flex-start;
+
+    margin-top: 4px;
+    padding: 5px 9px;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.painel-agendamento__status--aguardando {
+    color: #8a5a00;
+    background: #fff4cf;
+}
+
+.painel-agendamento__status--agendado {
+    color: #0c5f8f;
+    background: #dff3ff;
+}
+
+.painel-agendamento__status--cancelado {
+    color: #9f2d2d;
+    background: #ffe4e4;
+}
+
+.painel-agendamento__status--concluido {
+    color: #216b3a;
+    background: #dff6e7;
+}
+
+.painel-dia__rodape {
+    padding: 20px 24px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.painel-dia__novo {
+    width: 100%;
+    padding: 12px 16px;
+
+    border: 0;
+    border-radius: 12px;
+    background: #111827;
+
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.painel-dia__vazio {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.painel-dia__vazio p {
+    margin: 0;
+    color: #111827;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.painel-dia__vazio span {
+    color: #667085;
+    font-size: 13px;
+}
+.painel-dia__fundo {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+
+    width: 100%;
+    height: 100%;
+
+    padding: 0;
+    border: 0;
+    background:
+        rgba(15, 23, 42, 0.35);
+
+    cursor: default;
+}
+
+.painel-agendamento__horario {
+    align-self: flex-start;
+
+    padding: 0;
+    border: 0;
+    background: transparent;
+
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.painel-agendamento__horario:disabled {
+    cursor: default;
+}
+
+.painel-agendamento__acoes {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.painel-agendamento__acoes button {
+    padding: 7px 11px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #ffffff;
+
+    color: #344054;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.painel-agendamento__acoes button:hover:not(:disabled) {
+    border-color: #9ca3af;
+    background: #f9fafb;
+}
+
+.painel-agendamento__acoes button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.painel-dia__voltar {
+    width: 100%;
+    padding: 12px 16px;
+
+    border: 1px solid #d0d5dd;
+    border-radius: 12px;
+    background: #ffffff;
+
+    color: #344054;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.painel-dia__mensagem {
+    margin: 12px 0 0;
+    color: #667085;
+    font-size: 13px;
+    text-align: center;
+}
+.painel-horarios {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.painel-horario {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+
+    width: 100%;
+    min-height: 64px;
+    padding: 12px 14px;
+
+    box-sizing: border-box;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.painel-horario--disponivel {
+    color: #216b3a;
+    background: #f2fbf5;
+    border-color: #b8e5c8;
+    cursor: pointer;
+}
+
+.painel-horario--disponivel:hover {
+    background: #e4f7ea;
+    border-color: #59bf7c;
+}
+
+.painel-horario--disponivel strong {
+    color: #111827;
+    font-size: 14px;
+}
+
+.painel-horario--disponivel span {
+    color: #216b3a;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.painel-horario--ocupado {
+    background: #f9fafb;
+}
+
+.painel-horario--continuacao {
+    min-height: 48px;
+    opacity: 0.65;
+}
+
+.painel-horario__principal {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+
+    padding: 0;
+    border: 0;
+    background: transparent;
+
+    text-align: left;
+    cursor: pointer;
+}
+
+.painel-horario__principal:disabled {
+    cursor: default;
+}
+
+.painel-horario__principal strong {
+    color: #111827;
+    font-size: 14px;
+}
+
+.painel-horario__principal span {
+    color: #344054;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.painel-horario__principal small {
+    color: #667085;
+    font-size: 12px;
+}
+
+.painel-horario__acoes {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+}
+
+.painel-horario__acoes button {
+    padding: 6px 9px;
+
+    border: 1px solid #f1b5b5;
+    border-radius: 8px;
+    background: #fff5f5;
+
+    color: #9f2d2d;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.formulario-agendamento {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.formulario-agendamento > div {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.formulario-agendamento label {
+    color: #344054;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.formulario-agendamento select,
+.formulario-agendamento input {
+    width: 100%;
+    padding: 11px 12px;
+
+    box-sizing: border-box;
+    border: 1px solid #d0d5dd;
+    border-radius: 10px;
+    background: #ffffff;
+
+    color: #111827;
+    font-size: 14px;
+}
+
+.formulario-agendamento input:read-only {
+    color: #667085;
+    background: #f9fafb;
+}
+
+.formulario-agendamento > button {
+    width: 100%;
+    padding: 12px 16px;
+
+    border: 0;
+    border-radius: 12px;
+    background: #111827;
+
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
