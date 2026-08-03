@@ -1098,40 +1098,125 @@ app.post("/empresa/agendamentos", auth, async (req, res) => {
 });
 
 
-app.get("/empresa/agendamentos", auth, async (req, res) => {
-    try {
-        const empresaId =
-            (req as any).usuario.empresaId;
+app.get(
+    "/empresa/agendamentos",
+    auth,
+    async (req, res) => {
+        try {
+            const empresaId =
+                (req as any)
+                    .usuario
+                    .empresaId;
 
-        const agendamentos =
-            await prisma.agendamento.findMany({
-                where: {
-                    empresaId,
-                },
-                orderBy: {
-                    datahoraInicio: "asc",
-                },
-            });
+            const agendamentos =
+                await prisma
+                    .agendamento
+                    .findMany({
+                        where: {
+                            empresaId,
+                        },
 
-        return res.json(
-            agendamentos.map(
-                (agendamento) => ({
-                    ...agendamento,
-                    datahoraInicio:
-                        agendamento.datahoraInicio.toISOString(),
-                    datahoraFim:
-                        agendamento.datahoraFim.toISOString(),
-                })
-            )
-        );
-    } catch (erro) {
-        console.error(erro);
+                        orderBy: {
+                            datahoraInicio:
+                                "asc",
+                        },
+                    });
 
-        return res.status(500).json({
-            erro: "Erro ao buscar agendamentos",
-        });
+            function formatarDataLocal(
+                data: Date
+            ) {
+                const ano =
+                    data.getUTCFullYear();
+
+                const mes =
+                    String(
+                        data.getUTCMonth() +
+                            1
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
+                const dia =
+                    String(
+                        data.getUTCDate()
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
+                const hora =
+                    String(
+                        data.getUTCHours()
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
+                const minuto =
+                    String(
+                        data.getUTCMinutes()
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
+                const segundo =
+                    String(
+                        data.getUTCSeconds()
+                    ).padStart(
+                        2,
+                        "0"
+                    );
+
+                /*
+                 * Retorna sem Z e sem offset.
+                 * O navegador interpreta como
+                 * horário local, sem reduzir 3 horas.
+                 */
+                return (
+                    `${ano}-${mes}-${dia}` +
+                    `T${hora}:${minuto}:${segundo}`
+                );
+            }
+
+            const resposta =
+                agendamentos.map(
+                    (agendamento) => ({
+                        ...agendamento,
+
+                        datahoraInicio:
+                            formatarDataLocal(
+                                agendamento
+                                    .datahoraInicio
+                            ),
+
+                        datahoraFim:
+                            formatarDataLocal(
+                                agendamento
+                                    .datahoraFim
+                            ),
+                    })
+                );
+
+            return res.json(
+                resposta
+            );
+        } catch (erro) {
+            console.error(
+                "Erro ao buscar agendamentos:",
+                erro
+            );
+
+            return res
+                .status(500)
+                .json({
+                    erro:
+                        "Erro ao buscar agendamentos",
+                });
+        }
     }
-});
+);
 
 
 //cancelar agendamento
