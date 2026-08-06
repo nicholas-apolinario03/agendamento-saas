@@ -9,6 +9,13 @@ import { auth } from "./middleware/auth";
 import whatsappRoutes from "./routes/whatsappRoutes";
 import integracaoWhatsAppRoutes from "./routes/integracaoWhatsAppRoutes";
 
+import { enviarEmail } from "./service/emailService";
+import { montarEmailConfirmacaoAgendamento } from "./templates/emailConfirmacaoAgendamento";
+import {
+    gerarHashToken,
+    gerarTokenConfirmacao,
+} from "./utils/gerarTokenConfirmacao";
+
 const app = express();
 
 app.use(cors());
@@ -16,6 +23,8 @@ app.use(express.json());
 
 app.use(whatsappRoutes);
 app.use(integracaoWhatsAppRoutes);
+
+
 
 
 app.get("/teste", (req, res) => {
@@ -149,9 +158,9 @@ app.post(
 
             if (
                 tipoDisponibilidade !==
-                    "TODOS_OS_DIAS" &&
+                "TODOS_OS_DIAS" &&
                 tipoDisponibilidade !==
-                    "DIAS_DA_SEMANA"
+                "DIAS_DA_SEMANA"
             ) {
                 return res.status(400).json({
                     erro: "Tipo de disponibilidade inválido",
@@ -160,7 +169,7 @@ app.post(
 
             if (
                 tipoDisponibilidade ===
-                    "DIAS_DA_SEMANA" &&
+                "DIAS_DA_SEMANA" &&
                 (
                     !Array.isArray(diasSemana) ||
                     diasSemana.length === 0
@@ -191,7 +200,7 @@ app.post(
 
                         if (
                             tipoDisponibilidade ===
-                                "DIAS_DA_SEMANA" &&
+                            "DIAS_DA_SEMANA" &&
                             Array.isArray(diasSemana)
                         ) {
                             const diasValidos =
@@ -473,9 +482,9 @@ app.put(
 
             if (
                 tipoDisponibilidade !==
-                    "TODOS_OS_DIAS" &&
+                "TODOS_OS_DIAS" &&
                 tipoDisponibilidade !==
-                    "DIAS_DA_SEMANA"
+                "DIAS_DA_SEMANA"
             ) {
                 return res.status(400).json({
                     erro: "Tipo de disponibilidade inválido",
@@ -484,7 +493,7 @@ app.put(
 
             if (
                 tipoDisponibilidade ===
-                    "DIAS_DA_SEMANA" &&
+                "DIAS_DA_SEMANA" &&
                 (
                     !Array.isArray(diasSemana) ||
                     diasSemana.length === 0
@@ -532,7 +541,7 @@ app.put(
 
                         if (
                             tipoDisponibilidade ===
-                                "DIAS_DA_SEMANA" &&
+                            "DIAS_DA_SEMANA" &&
                             Array.isArray(diasSemana)
                         ) {
                             const diasValidos =
@@ -831,10 +840,9 @@ function converterDatahoraRecebidaParaUtc(
     const valorNormalizado =
         possuiFuso
             ? datahora
-            : `${
-                datahora.length === 16
-                    ? `${datahora}:00`
-                    : datahora
+            : `${datahora.length === 16
+                ? `${datahora}:00`
+                : datahora
             }${OFFSET_SAO_PAULO}`;
 
     const data = new Date(
@@ -909,7 +917,7 @@ function obterPartesDataSaoPaulo(
         minuto: Number(partes.minute),
         diaSemana:
             diasSemana[
-                partes.weekday
+            partes.weekday
             ],
     };
 }
@@ -929,173 +937,779 @@ function horarioParaMinutos(
     );
 }
 
-app.post("/empresa/agendamentos", auth, async (req, res) => {
+function montarPaginaResultadoConfirmacao({
+    titulo,
+    mensagem,
+    sucesso,
+}: {
+    titulo: string;
+    mensagem: string;
+    sucesso: boolean;
+}) {
+    const cor =
+        sucesso
+            ? "#15803d"
+            : "#b91c1c";
 
-    try {
-        const {
-            clienteId,
-            servicoId,
-            datahoraInicio,
-        } = req.body;
+    const fundo =
+        sucesso
+            ? "#f0fdf4"
+            : "#fef2f2";
 
-        const empresaId =
-            (req as any).usuario.empresaId;
+    return `
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8" />
+                <meta
+                    name="viewport"
+                    content="width=device-width, initial-scale=1.0"
+                />
+                <title>${titulo}</title>
+            </head>
+            <body
+                style="
+                    margin: 0;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px;
+                    box-sizing: border-box;
+                    background: #f4f5f7;
+                    font-family: Arial, Helvetica, sans-serif;
+                    color: #111827;
+                "
+            >
+                <main
+                    style="
+                        width: 100%;
+                        max-width: 560px;
+                        padding: 36px;
+                        box-sizing: border-box;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 18px;
+                        background: #ffffff;
+                        text-align: center;
+                        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+                    "
+                >
+                    <div
+                        style="
+                            width: 56px;
+                            height: 56px;
+                            margin: 0 auto 20px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: ${fundo};
+                            color: ${cor};
+                            font-size: 28px;
+                            font-weight: 700;
+                        "
+                    >
+                        ${sucesso ? "✓" : "!"}
+                    </div>
 
-        const cliente =
-            await prisma.cliente.findFirst({
-                where: {
-                    id: clienteId,
-                    empresaId,
-                },
-            });
+                    <p
+                        style="
+                            margin: 0 0 10px;
+                            color: #6b7280;
+                            font-size: 14px;
+                        "
+                    >
+                        New Horizon
+                    </p>
 
-        if (!cliente) {
-            return res.status(404).json({
-                erro: "Cliente não encontrado",
-            });
-        }
+                    <h1
+                        style="
+                            margin: 0 0 16px;
+                            font-size: 28px;
+                            line-height: 1.25;
+                        "
+                    >
+                        ${titulo}
+                    </h1>
 
-        const servico =
-            await prisma.servico.findFirst({
-                where: {
-                    id: servicoId,
-                    empresaId,
-                },
-            });
+                    <p
+                        style="
+                            margin: 0;
+                            color: #4b5563;
+                            font-size: 16px;
+                            line-height: 1.6;
+                        "
+                    >
+                        ${mensagem}
+                    </p>
+                </main>
+            </body>
+        </html>
+    `;
+}
 
-        if (!servico) {
-            return res.status(404).json({
-                erro: "Serviço não encontrado",
-            });
-        }
+app.post(
+    "/empresa/agendamentos",
+    auth,
+    async (req, res) => {
+        try {
+            const {
+                clienteId,
+                servicoId,
+                datahoraInicio,
+                confirmacao,
+            } = req.body;
 
-        const inicio =
-            converterDatahoraRecebidaParaUtc(
-                datahoraInicio
-            );
+            const empresaId =
+                (req as any)
+                    .usuario
+                    .empresaId;
 
-        if (!inicio) {
-            return res.status(400).json({
-                erro: "Data e horário inválidos",
-            });
-        }
+            if (
+                confirmacao !==
+                "AUTOMATICA" &&
+                confirmacao !==
+                "EMAIL"
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        erro:
+                            "Tipo de confirmação inválido.",
+                    });
+            }
 
-        const fim = new Date(
-            inicio.getTime() +
-            servico.duracaoMinutos *
-            60 *
-            1000
-        );
+            const cliente =
+                await prisma
+                    .cliente
+                    .findFirst({
+                        where: {
+                            id:
+                                Number(
+                                    clienteId
+                                ),
 
-        const partesInicio =
-            obterPartesDataSaoPaulo(
-                inicio
-            );
+                            empresaId,
+                        },
+                    });
 
-        const inicioMinutos =
-            partesInicio.hora * 60 +
-            partesInicio.minuto;
+            if (!cliente) {
+                return res
+                    .status(404)
+                    .json({
+                        erro:
+                            "Cliente não encontrado.",
+                    });
+            }
 
-        const fimMinutos =
-            inicioMinutos +
-            servico.duracaoMinutos;
+            const solicitarConfirmacaoEmail =
+                confirmacao ===
+                "EMAIL";
 
-        const horariosFuncionamento =
-            await prisma.horarioFuncionamento.findMany({
-                where: {
-                    empresaId,
-                    diaSemana:
-                        partesInicio.diaSemana,
-                    ativo: true,
-                },
-            });
+            if (
+                solicitarConfirmacaoEmail &&
+                !cliente.email?.trim()
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        erro:
+                            "O cliente não possui e-mail cadastrado.",
+                    });
+            }
 
-        const dentroDoHorario =
-            horariosFuncionamento.some(
-                (horario) => {
-                    const abertura =
-                        horarioParaMinutos(
-                            horario.horaInicio
-                        );
+            const servico =
+                await prisma
+                    .servico
+                    .findFirst({
+                        where: {
+                            id:
+                                Number(
+                                    servicoId
+                                ),
 
-                    const fechamento =
-                        horarioParaMinutos(
-                            horario.horaFim
-                        );
+                            empresaId,
+                        },
+                    });
 
-                    return (
-                        inicioMinutos >=
-                            abertura &&
-                        fimMinutos <=
-                            fechamento
+            if (!servico) {
+                return res
+                    .status(404)
+                    .json({
+                        erro:
+                            "Serviço não encontrado.",
+                    });
+            }
+
+            const inicio =
+                converterDatahoraRecebidaParaUtc(
+                    datahoraInicio
+                );
+
+            if (!inicio) {
+                return res
+                    .status(400)
+                    .json({
+                        erro:
+                            "Data e horário inválidos.",
+                    });
+            }
+
+            const fim =
+                new Date(
+                    inicio.getTime() +
+                    servico
+                        .duracaoMinutos *
+                    60 *
+                    1000
+                );
+
+            const partesInicio =
+                obterPartesDataSaoPaulo(
+                    inicio
+                );
+
+            const inicioMinutos =
+                partesInicio.hora *
+                60 +
+                partesInicio.minuto;
+
+            const fimMinutos =
+                inicioMinutos +
+                servico
+                    .duracaoMinutos;
+
+            const horariosFuncionamento =
+                await prisma
+                    .horarioFuncionamento
+                    .findMany({
+                        where: {
+                            empresaId,
+
+                            diaSemana:
+                                partesInicio
+                                    .diaSemana,
+
+                            ativo:
+                                true,
+                        },
+                    });
+
+            const dentroDoHorario =
+                horariosFuncionamento
+                    .some(
+                        (
+                            horario
+                        ) => {
+                            const abertura =
+                                horarioParaMinutos(
+                                    horario
+                                        .horaInicio
+                                );
+
+                            const fechamento =
+                                horarioParaMinutos(
+                                    horario
+                                        .horaFim
+                                );
+
+                            return (
+                                inicioMinutos >=
+                                abertura &&
+                                fimMinutos <=
+                                fechamento
+                            );
+                        }
                     );
+
+            if (
+                !dentroDoHorario
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        erro:
+                            "O horário escolhido está fora do horário de funcionamento.",
+                    });
+            }
+
+            const conflito =
+                await prisma
+                    .agendamento
+                    .findFirst({
+                        where: {
+                            empresaId,
+
+                            status: {
+                                in: [
+                                    "AGUARDANDO",
+                                    "AGENDADO",
+                                ],
+                            },
+
+                            datahoraInicio: {
+                                lt:
+                                    fim,
+                            },
+
+                            datahoraFim: {
+                                gt:
+                                    inicio,
+                            },
+                        },
+                    });
+
+            if (conflito) {
+                return res
+                    .status(409)
+                    .json({
+                        erro:
+                            "Horário já está ocupado.",
+                    });
+            }
+
+            let tokenPublico:
+                string | null =
+                null;
+
+            let tokenHash:
+                string | null =
+                null;
+
+            let tokenExpiraEm:
+                Date | null =
+                null;
+
+            if (
+                solicitarConfirmacaoEmail
+            ) {
+                const token =
+                    gerarTokenConfirmacao();
+
+                tokenPublico =
+                    token.tokenPublico;
+
+                tokenHash =
+                    token.tokenHash;
+
+                tokenExpiraEm =
+                    token.expiraEm;
+            }
+
+            const agendamento =
+                await prisma
+                    .agendamento
+                    .create({
+                        data: {
+                            empresaId,
+
+                            clienteId:
+                                cliente.id,
+
+                            servicoId:
+                                servico.id,
+
+                            datahoraInicio:
+                                inicio,
+
+                            datahoraFim:
+                                fim,
+
+                            status:
+                                solicitarConfirmacaoEmail
+                                    ? "AGUARDANDO"
+                                    : "AGENDADO",
+
+                            tokenConfirmacao:
+                                tokenHash,
+
+                            tokenConfirmacaoExpiraEm:
+                                tokenExpiraEm,
+
+                            confirmadoEm:
+                                solicitarConfirmacaoEmail
+                                    ? null
+                                    : new Date(),
+
+                            emailConfirmacaoEnviadoEm:
+                                null,
+                        },
+                    });
+
+            let emailEnviado =
+                false;
+
+            let aviso:
+                string | null =
+                null;
+
+            if (
+                solicitarConfirmacaoEmail &&
+                tokenPublico
+            ) {
+                try {
+                    const empresa =
+                        await prisma
+                            .empresa
+                            .findUnique({
+                                where: {
+                                    id:
+                                        empresaId,
+                                },
+                            });
+
+                    if (!empresa) {
+                        throw new Error(
+                            "Empresa não encontrada para montar o e-mail."
+                        );
+                    }
+
+                    const urlBackend =
+                        process.env
+                            .URL_BACKEND
+                            ?.replace(
+                                /\/+$/,
+                                ""
+                            );
+
+                    if (!urlBackend) {
+                        throw new Error(
+                            "URL_BACKEND não configurada."
+                        );
+                    }
+
+                    const urlConfirmacao =
+                        `${urlBackend}` +
+                        `/agendamentos/confirmar/` +
+                        `${encodeURIComponent(
+                            tokenPublico
+                        )}`;
+
+                    const dataFormatada =
+                        new Intl.DateTimeFormat(
+                            "pt-BR",
+                            {
+                                timeZone:
+                                    FUSO_AGENDA,
+
+                                weekday:
+                                    "long",
+
+                                day:
+                                    "2-digit",
+
+                                month:
+                                    "long",
+
+                                year:
+                                    "numeric",
+                            }
+                        ).format(
+                            inicio
+                        );
+
+                    const horarioFormatado =
+                        new Intl.DateTimeFormat(
+                            "pt-BR",
+                            {
+                                timeZone:
+                                    FUSO_AGENDA,
+
+                                hour:
+                                    "2-digit",
+
+                                minute:
+                                    "2-digit",
+
+                                hour12:
+                                    false,
+                            }
+                        ).format(
+                            inicio
+                        );
+
+                    const {
+                        assunto,
+                        texto,
+                        html,
+                    } =
+                        montarEmailConfirmacaoAgendamento({
+                            nomeCliente:
+                                cliente.nome,
+
+                            nomeEmpresa:
+                                empresa.nome,
+
+                            nomeServico:
+                                servico.nome,
+
+                            dataFormatada,
+
+                            horarioFormatado,
+
+                            urlConfirmacao,
+                        });
+
+                    await enviarEmail({
+                        para:
+                            cliente.email!,
+
+                        assunto,
+
+                        texto,
+
+                        html,
+
+                        responderPara:
+                            empresa.email ??
+                            undefined,
+                    });
+
+                    await prisma
+                        .agendamento
+                        .update({
+                            where: {
+                                id:
+                                    agendamento.id,
+                            },
+
+                            data: {
+                                emailConfirmacaoEnviadoEm:
+                                    new Date(),
+                            },
+                        });
+
+                    emailEnviado =
+                        true;
+                } catch (
+                erroEmail
+                ) {
+                    console.error(
+                        "Agendamento criado, mas ocorreu um erro ao enviar o e-mail:",
+                        erroEmail
+                    );
+
+                    aviso =
+                        "O agendamento foi criado, mas não foi possível enviar o e-mail de confirmação. O agendamento continuará aguardando. Você pode cancelá-lo e criar outro.";
                 }
+            }
+
+            return res
+                .status(201)
+                .json({
+                    ...agendamento,
+
+                    datahoraInicio:
+                        agendamento
+                            .datahoraInicio
+                            .toISOString(),
+
+                    datahoraFim:
+                        agendamento
+                            .datahoraFim
+                            .toISOString(),
+
+                    confirmacao:
+                        solicitarConfirmacaoEmail
+                            ? "EMAIL"
+                            : "AUTOMATICA",
+
+                    aguardandoConfirmacao:
+                        solicitarConfirmacaoEmail,
+
+                    emailEnviado,
+
+                    mensagem:
+                        solicitarConfirmacaoEmail &&
+                            emailEnviado
+                            ? "Agendamento criado e e-mail de confirmação enviado."
+                            : solicitarConfirmacaoEmail
+                                ? "Agendamento criado aguardando confirmação."
+                                : "Agendamento confirmado com sucesso.",
+
+                    aviso,
+                });
+        } catch (erro) {
+            console.error(
+                "Erro ao criar agendamento:",
+                erro
             );
 
-        if (!dentroDoHorario) {
-            return res.status(400).json({
-                erro: "O horário escolhido está fora do horário de funcionamento",
-            });
+            return res
+                .status(500)
+                .json({
+                    erro:
+                        "Erro ao criar agendamento.",
+                });
         }
-
-        const conflito =
-            await prisma.agendamento.findFirst({
-                where: {
-                    empresaId,
-                    status: {
-                        in: [
-                            "AGUARDANDO_CONFIRMACAO",
-                            "AGENDADO",
-                        ],
-                    },
-                    datahoraInicio: {
-                        lt: fim,
-                    },
-                    datahoraFim: {
-                        gt: inicio,
-                    },
-                },
-            });
-
-        if (conflito) {
-            return res.status(409).json({
-                erro: "Horário já está ocupado",
-            });
-        }
-
-        const agendamento =
-            await prisma.agendamento.create({
-                data: {
-                    empresaId,
-                    clienteId,
-                    servicoId,
-                    datahoraInicio:
-                        inicio,
-                    datahoraFim:
-                        fim,
-                    status: "AGENDADO",
-                },
-            });
-
-        return res.status(201).json({
-            ...agendamento,
-            datahoraInicio:
-                agendamento.datahoraInicio.toISOString(),
-            datahoraFim:
-                agendamento.datahoraFim.toISOString(),
-        });
-
-    } catch (erro) {
-        console.error(
-            "Erro ao criar agendamento:",
-            erro
-        );
-
-        return res.status(500).json({
-            erro: "Erro ao criar agendamento",
-        });
     }
-});
+);
+
+app.get(
+    "/agendamentos/confirmar/:token",
+    async (req, res) => {
+        try {
+            const token =
+                String(req.params.token ?? "")
+                    .trim();
+
+            if (!token) {
+                return res
+                    .status(400)
+                    .send(
+                        montarPaginaResultadoConfirmacao({
+                            titulo:
+                                "Link inválido",
+                            mensagem:
+                                "O token de confirmação não foi informado.",
+                            sucesso:
+                                false,
+                        })
+                    );
+            }
+
+            const tokenHash =
+                gerarHashToken(token);
+
+            const agendamento =
+                await prisma.agendamento.findUnique({
+                    where: {
+                        tokenConfirmacao:
+                            tokenHash,
+                    },
+                    include: {
+                        empresa: true,
+                        servico: true,
+                        cliente: true,
+                    },
+                });
+
+            if (!agendamento) {
+                return res
+                    .status(404)
+                    .send(
+                        montarPaginaResultadoConfirmacao({
+                            titulo:
+                                "Link inválido",
+                            mensagem:
+                                "Este link não existe ou já foi utilizado.",
+                            sucesso:
+                                false,
+                        })
+                    );
+            }
+
+            if (
+                agendamento.status ===
+                "CANCELADO"
+            ) {
+                return res
+                    .status(409)
+                    .send(
+                        montarPaginaResultadoConfirmacao({
+                            titulo:
+                                "Agendamento cancelado",
+                            mensagem:
+                                "Este agendamento já foi cancelado.",
+                            sucesso:
+                                false,
+                        })
+                    );
+            }
+
+            if (
+                agendamento.tokenConfirmacaoExpiraEm &&
+                agendamento.tokenConfirmacaoExpiraEm <
+                new Date()
+            ) {
+                return res
+                    .status(410)
+                    .send(
+                        montarPaginaResultadoConfirmacao({
+                            titulo:
+                                "Link expirado",
+                            mensagem:
+                                "O prazo para confirmar este agendamento terminou.",
+                            sucesso:
+                                false,
+                        })
+                    );
+            }
+
+            const confirmado =
+                await prisma.agendamento.update({
+                    where: {
+                        id: agendamento.id,
+                    },
+                    data: {
+                        status:
+                            "AGENDADO",
+                        confirmadoEm:
+                            new Date(),
+                        tokenConfirmacao:
+                            null,
+                        tokenConfirmacaoExpiraEm:
+                            null,
+                    },
+                });
+
+            const dataFormatada =
+                new Intl.DateTimeFormat(
+                    "pt-BR",
+                    {
+                        timeZone:
+                            FUSO_AGENDA,
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                    }
+                ).format(
+                    confirmado.datahoraInicio
+                );
+
+            const horarioFormatado =
+                new Intl.DateTimeFormat(
+                    "pt-BR",
+                    {
+                        timeZone:
+                            FUSO_AGENDA,
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                    }
+                ).format(
+                    confirmado.datahoraInicio
+                );
+
+            return res.status(200).send(
+                montarPaginaResultadoConfirmacao({
+                    titulo:
+                        "Agendamento confirmado",
+                    mensagem:
+                        `${agendamento.servico.nome} confirmado para ${dataFormatada} às ${horarioFormatado}.`,
+                    sucesso:
+                        true,
+                })
+            );
+        } catch (erro) {
+            console.error(
+                "Erro ao confirmar agendamento:",
+                erro
+            );
+
+            return res.status(500).send(
+                montarPaginaResultadoConfirmacao({
+                    titulo:
+                        "Não foi possível confirmar",
+                    mensagem:
+                        "Ocorreu um erro ao processar a confirmação. Tente novamente mais tarde.",
+                    sucesso:
+                        false,
+                })
+            );
+        }
+    }
+);
 
 
 app.get(
@@ -1125,58 +1739,62 @@ app.get(
             function formatarDataLocal(
                 data: Date
             ) {
-                const ano =
-                    data.getUTCFullYear();
+                const partes =
+                    Object.fromEntries(
+                        new Intl.DateTimeFormat(
+                            "en-CA",
+                            {
+                                timeZone:
+                                    "America/Sao_Paulo",
 
-                const mes =
-                    String(
-                        data.getUTCMonth() +
-                            1
-                    ).padStart(
-                        2,
-                        "0"
-                    );
+                                year:
+                                    "numeric",
 
-                const dia =
-                    String(
-                        data.getUTCDate()
-                    ).padStart(
-                        2,
-                        "0"
-                    );
+                                month:
+                                    "2-digit",
 
-                const hora =
-                    String(
-                        data.getUTCHours()
-                    ).padStart(
-                        2,
-                        "0"
-                    );
+                                day:
+                                    "2-digit",
 
-                const minuto =
-                    String(
-                        data.getUTCMinutes()
-                    ).padStart(
-                        2,
-                        "0"
-                    );
+                                hour:
+                                    "2-digit",
 
-                const segundo =
-                    String(
-                        data.getUTCSeconds()
-                    ).padStart(
-                        2,
-                        "0"
-                    );
+                                minute:
+                                    "2-digit",
 
-                /*
-                 * Retorna sem Z e sem offset.
-                 * O navegador interpreta como
-                 * horário local, sem reduzir 3 horas.
-                 */
+                                second:
+                                    "2-digit",
+
+                                hour12:
+                                    false,
+                            }
+                        )
+                            .formatToParts(
+                                data
+                            )
+                            .filter(
+                                (parte) =>
+                                    parte.type !==
+                                    "literal"
+                            )
+                            .map(
+                                (parte) => [
+                                    parte.type,
+                                    parte.value,
+                                ]
+                            )
+                    ) as Record<
+                        string,
+                        string
+                    >;
+
                 return (
-                    `${ano}-${mes}-${dia}` +
-                    `T${hora}:${minuto}:${segundo}`
+                    `${partes.year}-` +
+                    `${partes.month}-` +
+                    `${partes.day}T` +
+                    `${partes.hour}:` +
+                    `${partes.minute}:` +
+                    `${partes.second}`
                 );
             }
 
@@ -1389,9 +2007,9 @@ app.put(
 
                         return (
                             inicioMinutos >=
-                                abertura &&
+                            abertura &&
                             fimMinutos <=
-                                fechamento
+                            fechamento
                         );
                     }
                 );
@@ -1411,7 +2029,7 @@ app.put(
                         },
                         status: {
                             in: [
-                                "AGUARDANDO_CONFIRMACAO",
+                                "AGUARDANDO",
                                 "AGENDADO",
                             ],
                         },

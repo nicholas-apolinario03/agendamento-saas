@@ -306,9 +306,10 @@ export function DashboardAgendamento() {
     }, []);
 
     async function salvarNovoAgendamento(
-        dados: NovoAgendamento
-    ) {
-        try {
+    dados: NovoAgendamento
+) {
+    try {
+        const resposta =
             await api.post(
                 "empresa/agendamentos",
                 dados,
@@ -318,28 +319,35 @@ export function DashboardAgendamento() {
                 }
             );
 
-            setMensagem(
-                "Agendamento criado com sucesso."
-            );
+        setMensagem(
+            resposta.data.aviso ??
+            resposta.data.mensagem ??
+            (
+                dados.confirmacao ===
+                "EMAIL"
+                    ? "Agendamento criado aguardando confirmação."
+                    : "Agendamento criado com sucesso."
+            )
+        );
 
-            await buscarAgendamentos();
+        await buscarAgendamentos();
 
-            return true;
-        } catch (erro: any) {
-            console.error(
-                "Erro ao criar agendamento:",
-                erro
-            );
+        return true;
+    } catch (erro: any) {
+        console.error(
+            "Erro ao criar agendamento:",
+            erro
+        );
 
-            setMensagem(
-                erro.response?.data
-                    ?.erro ??
-                "Erro ao criar agendamento."
-            );
+        setMensagem(
+            erro.response?.data
+                ?.erro ??
+            "Erro ao criar agendamento."
+        );
 
-            return false;
-        }
+        return false;
     }
+}
 
     async function editarAgendamento(
         id: number,

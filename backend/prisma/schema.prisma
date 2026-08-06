@@ -85,6 +85,12 @@ model Agendamento {
   datahoraInicio DateTime
   datahoraFim    DateTime
 
+    tokenConfirmacao         String?   @unique
+  tokenConfirmacaoExpiraEm DateTime?
+  confirmadoEm             DateTime?
+  emailConfirmacaoEnviadoEm DateTime?
+
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

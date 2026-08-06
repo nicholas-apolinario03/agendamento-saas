@@ -6,6 +6,7 @@ import {
 import type {
     Agendamento,
     NovoAgendamento,
+    TipoConfirmacao,
 } from "../types/Agendamento";
 
 import type {
@@ -52,11 +53,20 @@ export function FormularioAgendamento({
         setDatahoraInicio,
     ] = useState("");
 
+    const [
+        confirmacao,
+        setConfirmacao,
+    ] = useState<TipoConfirmacao>(
+        "AUTOMATICA"
+    );
+
     function formatarParaDatetimeLocal(
         dataRecebida: string
     ) {
         const data =
-            new Date(dataRecebida);
+            new Date(
+                dataRecebida
+            );
 
         const ano =
             data.getFullYear();
@@ -116,14 +126,23 @@ export function FormularioAgendamento({
                 )
             );
 
+            setConfirmacao(
+                "AUTOMATICA"
+            );
+
             return;
         }
 
         setClienteId(0);
+
         setServicoId(0);
 
         setDatahoraInicio(
             datahoraInicial ?? ""
+        );
+
+        setConfirmacao(
+            "AUTOMATICA"
         );
     }, [
         agendamento,
@@ -148,6 +167,7 @@ export function FormularioAgendamento({
             clienteId,
             servicoId,
             datahoraInicio,
+            confirmacao,
         });
     }
 
@@ -167,7 +187,9 @@ export function FormularioAgendamento({
                     onChange={(event) =>
                         setClienteId(
                             Number(
-                                event.target.value
+                                event
+                                    .target
+                                    .value
                             )
                         )
                     }
@@ -204,7 +226,9 @@ export function FormularioAgendamento({
                     onChange={(event) =>
                         setServicoId(
                             Number(
-                                event.target.value
+                                event
+                                    .target
+                                    .value
                             )
                         )
                     }
@@ -225,7 +249,10 @@ export function FormularioAgendamento({
                             >
                                 {servico.nome}
                                 {" — "}
-                                {servico.duracaoMinutos}
+                                {
+                                    servico
+                                        .duracaoMinutos
+                                }
                                 {" min"}
                             </option>
                         )
@@ -244,7 +271,9 @@ export function FormularioAgendamento({
                     value={datahoraInicio}
                     onChange={(event) =>
                         setDatahoraInicio(
-                            event.target.value
+                            event
+                                .target
+                                .value
                         )
                     }
                     readOnly={
@@ -256,6 +285,70 @@ export function FormularioAgendamento({
                     required
                 />
             </div>
+
+            {agendamento === null && (
+                <fieldset className="formulario-agendamento__confirmacao">
+                    <legend>
+                        Confirmação do agendamento
+                    </legend>
+
+                    <label className="formulario-agendamento__opcao-confirmacao">
+                        <input
+                            type="radio"
+                            name="confirmacao"
+                            value="AUTOMATICA"
+                            checked={
+                                confirmacao ===
+                                "AUTOMATICA"
+                            }
+                            onChange={() =>
+                                setConfirmacao(
+                                    "AUTOMATICA"
+                                )
+                            }
+                        />
+
+                        <span>
+                            <strong>
+                                Confirmar automaticamente
+                            </strong>
+
+                            <small>
+                                O agendamento já será criado
+                                como confirmado.
+                            </small>
+                        </span>
+                    </label>
+
+                    <label className="formulario-agendamento__opcao-confirmacao">
+                        <input
+                            type="radio"
+                            name="confirmacao"
+                            value="EMAIL"
+                            checked={
+                                confirmacao ===
+                                "EMAIL"
+                            }
+                            onChange={() =>
+                                setConfirmacao(
+                                    "EMAIL"
+                                )
+                            }
+                        />
+
+                        <span>
+                            <strong>
+                                Cliente confirma por e-mail
+                            </strong>
+
+                            <small>
+                                O cliente receberá um link para
+                                confirmar o agendamento.
+                            </small>
+                        </span>
+                    </label>
+                </fieldset>
+            )}
 
             <button type="submit">
                 {agendamento

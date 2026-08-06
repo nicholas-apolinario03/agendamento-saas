@@ -9,6 +9,7 @@ import { PublicRoute } from "./components/PublicRoute";
 import { CadastroClienteEmpresa } from "./pages/CadastroClienteEmpresa";
 import { DashboardAgendamento } from "./pages/DashboardAgendamento";
 import { PoliticaPrivacidade } from "./components/PoliticaPrivacidade";
+import Index from "./pages/Index";
 
 
 
@@ -19,6 +20,9 @@ function App() {
     path="/politica-de-privacidade"
     element={<PoliticaPrivacidade />}
 />
+<Route path="/" element={
+  <Index/>
+}/>
       <Route path="/dashboard"
         element={
           <ProtecaoRota>
