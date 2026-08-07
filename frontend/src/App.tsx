@@ -6,7 +6,7 @@ import { DashboardHorario } from "./pages/DashboardHorario";
 import { DashboardEmpresa } from "./pages/DashboardEmpresa";
 import { ProtecaoRota } from "./components/ProtecaoRota";
 import { PublicRoute } from "./components/PublicRoute";
-import { CadastroClienteEmpresa } from "./pages/CadastroClienteEmpresa";
+import { CadastroClienteEmpresa } from "./components/CadastroClienteEmpresa";
 import { DashboardAgendamento } from "./pages/DashboardAgendamento";
 import { PoliticaPrivacidade } from "./components/PoliticaPrivacidade";
 import Index from "./pages/PaginaInicial";

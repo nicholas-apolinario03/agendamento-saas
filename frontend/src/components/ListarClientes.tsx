@@ -1,13 +1,13 @@
 import { CardCliente } from "./CardCliente";
 import type { Cliente } from "../types/Cliente";
 
-type ListarHorariosProps = {
+type ListarClientesProps = {
 
     clientes: Cliente[];
    
 };
 
-export function ListarHorarios({ clientes }: ListarHorariosProps) {
+export function ListarClientes({ clientes }: ListarClientesProps) {
     return (
 
         <div>

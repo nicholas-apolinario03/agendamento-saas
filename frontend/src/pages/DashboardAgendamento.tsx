@@ -1,54 +1,28 @@
-import {useEffect,useState,} from "react";
-import {api,} from "../services/api";
+import { useEffect, useState, } from "react";
+import { api, } from "../services/api";
 import "../components/css/DashboardAgendamento.css"
 
 import CalendarioAgendamentos from "../components/agendamentos/CalendarioAgendamentos";
 import { ListaServicos } from "../components/ListarServicos";
 import { FormularioServico } from "../components/FormularioServico";
 
-import type {Agendamento,NovoAgendamento,} from "../types/Agendamento";
-import type { Cliente,} from "../types/Cliente";
-import type { HorarioFuncionamento,} from "../types/HorarioFuncionamento";
-import type {Servico, NovoServico} from "../types/Servico";
+import type { Agendamento, NovoAgendamento, } from "../types/Agendamento";
+import type { Cliente, } from "../types/Cliente";
+import type { HorarioFuncionamento, } from "../types/HorarioFuncionamento";
+import type { Servico, NovoServico } from "../types/Servico";
 
 import DashboardLayout from "../layouts/DashboardLayout";
+import { CadastroClienteEmpresa } from "../components/CadastroClienteEmpresa";
+import { ListarClientes } from "../components/ListarClientes";
 
 export function DashboardAgendamento() {
-    const [
-        clientes,
-        setClientes,
-    ] = useState<Cliente[]>([]);
-
-    const [
-        servicos,
-        setServicos,
-    ] = useState<Servico[]>([]);
-    const [
-        servicoEditando,
-        setServicoEditando
-    ] = useState<Servico | null>(null);
-
-
-    const [
-        horarios,
-        setHorarios,
-    ] =
-        useState<
-            HorarioFuncionamento[]
-        >([]);
-
-    const [
-        agendamentos,
-        setAgendamentos,
-    ] = useState<Agendamento[]>(
-        []
-    );
-
-    const [
-        mensagem,
-        setMensagem,
-    ] = useState("");
-
+    const [clientes, setClientes,] = useState<Cliente[]>([]);
+    const [servicos, setServicos,] = useState<Servico[]>([]);
+    const [servicoEditando, setServicoEditando] = useState<Servico | null>(null);
+    const [horarios, setHorarios,] = useState<HorarioFuncionamento[]>([]);
+    const [agendamentos, setAgendamentos,] = useState<Agendamento[]>([]);
+    const [MensagemAgendamento, setMensagemAgendamento,] = useState("");
+    const [mensagemServico, setMensagemServico,] = useState("");
     type AbaGerenciamento =
         | "SERVICOS"
         | "CLIENTES";
@@ -185,7 +159,7 @@ export function DashboardAgendamento() {
                 setServicoEditando(null);
             }
 
-            setMensagem(
+            setMensagemServico(
                 "Serviço excluído com sucesso"
             );
 
@@ -198,7 +172,7 @@ export function DashboardAgendamento() {
                 erro
             );
 
-            setMensagem(
+            setMensagemServico(
                 erro.response?.data?.erro ??
                 "Erro ao excluir serviço"
             );
@@ -213,7 +187,7 @@ export function DashboardAgendamento() {
     ) {
 
         setServicoEditando(servico);
-        setMensagem("");
+        setMensagemServico("");
 
     }
 
@@ -221,7 +195,7 @@ export function DashboardAgendamento() {
     function cancelarEdicao() {
 
         setServicoEditando(null);
-        setMensagem("");
+        setMensagemServico("");
 
     }
 
@@ -248,7 +222,7 @@ export function DashboardAgendamento() {
                     }
                 );
 
-                setMensagem(
+                setMensagemServico(
                     "Serviço atualizado com sucesso"
                 );
 
@@ -265,7 +239,7 @@ export function DashboardAgendamento() {
                     }
                 );
 
-                setMensagem(
+                setMensagemServico(
                     "Serviço cadastrado com sucesso"
                 );
 
@@ -282,7 +256,7 @@ export function DashboardAgendamento() {
                 erro
             );
 
-            setMensagem(
+            setMensagemServico(
                 erro.response?.data?.erro ??
                 "Erro ao salvar serviço"
             );
@@ -314,7 +288,7 @@ export function DashboardAgendamento() {
                     }
                 );
 
-            setMensagem(
+            setMensagemAgendamento(
                 resposta.data.aviso ??
                 resposta.data.mensagem ??
                 (
@@ -334,7 +308,7 @@ export function DashboardAgendamento() {
                 erro
             );
 
-            setMensagem(
+            setMensagemAgendamento(
                 erro.response?.data
                     ?.erro ??
                 "Erro ao criar agendamento."
@@ -361,7 +335,7 @@ export function DashboardAgendamento() {
                 }
             );
 
-            setMensagem(
+            setMensagemAgendamento(
                 "Agendamento atualizado com sucesso."
             );
 
@@ -374,7 +348,7 @@ export function DashboardAgendamento() {
                 erro
             );
 
-            setMensagem(
+            setMensagemAgendamento(
                 erro.response?.data
                     ?.erro ??
                 "Erro ao editar agendamento."
@@ -397,7 +371,7 @@ export function DashboardAgendamento() {
                 }
             );
 
-            setMensagem(
+            setMensagemAgendamento(
                 "Agendamento cancelado com sucesso."
             );
 
@@ -410,7 +384,7 @@ export function DashboardAgendamento() {
                 erro
             );
 
-            setMensagem(
+            setMensagemAgendamento(
                 erro.response?.data
                     ?.erro ??
                 "Erro ao cancelar agendamento."
@@ -447,12 +421,12 @@ export function DashboardAgendamento() {
                         cancelarAgendamento
                     }
                 />
+                {MensagemAgendamento && (
+                                        <p className="dashboard-agendamento__mensagem">
+                                            {MensagemAgendamento}
+                                        </p>
+                                    )}
 
-                {mensagem && (
-                    <p className="dashboard-agendamento__mensagem">
-                        {mensagem}
-                    </p>
-                )}
                 <section className="painel-gerenciamento">
                     <header className="painel-gerenciamento__cabecalho">
                         <div>
@@ -537,6 +511,11 @@ export function DashboardAgendamento() {
                                             Cancelar edição
                                         </button>
                                     )}
+                                    {mensagemServico && (
+                                        <p className="dashboard-agendamento__mensagem">
+                                            {mensagemServico}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="painel-gerenciamento__lista">
@@ -554,16 +533,11 @@ export function DashboardAgendamento() {
                                 </div>
                             </section>
                         ) : (
-                            <section className="painel-gerenciamento__vazio">
-                                <h3>
-                                    Gerenciamento de clientes
-                                </h3>
-
-                                <p>
-                                    O formulário e a lista de
-                                    clientes serão adicionados
-                                    nesta aba.
-                                </p>
+                            <section className="painel-gerenciamento__secao">
+                                <CadastroClienteEmpresa/>
+                                <div className="painel-gerenciamento__lista">
+                                <ListarClientes clientes={clientes}/>
+                                </div>
                             </section>
                         )}
                     </div>

@@ -312,10 +312,7 @@ export function FormularioServico({
 
 
    return (
-    <form
-        className="formulario"
-        onSubmit={enviarFormulario}
-    >
+    <form className="formulario" onSubmit={enviarFormulario}>
         <div className="formulario-login__cabecalho">
             <h2>
                 {servico
