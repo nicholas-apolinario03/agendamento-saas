@@ -2,7 +2,7 @@ import {
     useEffect,
     useState
 } from "react";
-
+import "./css/Formulario.css"
 import type {
     ExcecaoServico,
     NovoServico,
@@ -311,134 +311,180 @@ export function FormularioServico({
     }
 
 
-    return (
-        <form onSubmit={enviarFormulario}>
+   return (
+    <form
+        className="formulario"
+        onSubmit={enviarFormulario}
+    >
+        <div className="formulario-login__cabecalho">
+            <h2>
+                {servico
+                    ? "Editar serviço"
+                    : "Novo serviço"}
+            </h2>
 
-           
+            <p>
+                Configure as informações,
+                disponibilidade e exceções
+                deste serviço.
+            </p>
+        </div>
 
-                <input
-                    type="text"
-                    placeholder="Nome do serviço"
-                    value={nome}
-                    onChange={(event) =>
-                        setNome(
+        <div className="formulario-login__campo">
+            <label htmlFor="servico-nome">
+                Nome do serviço
+            </label>
+
+            <input
+                id="servico-nome"
+                type="text"
+                placeholder="Nome do serviço"
+                value={nome}
+                onChange={(event) =>
+                    setNome(
+                        event.target.value
+                    )
+                }
+                required
+            />
+        </div>
+
+        <div className="formulario-login__campo">
+            <label htmlFor="servico-duracao">
+                Duração (Minutos)
+            </label>
+
+            <input
+                id="servico-duracao"
+                type="number"
+                min={1}
+                placeholder="Duração em minutos"
+                value={duracaoMinutos}
+                onChange={(event) =>
+                    setDuracaoMinutos(
+                        Number(
                             event.target.value
                         )
-                    }
-                    required
-                />
-           
+                    )
+                }
+                required
+            />
+        </div>
 
+        <div className="formulario-login__campo">
+            <label htmlFor="servico-descricao">
+                Descrição (Opcional)
+            </label>
 
-           
+            <input
+                id="servico-descricao"
+                type="text"
+                placeholder="Descrição"
+                value={descricao}
+                onChange={(event) =>
+                    setDescricao(
+                        event.target.value
+                    )
+                }
+            />
+        </div>
 
-                <input
-                    type="number"
-                    min={1}
-                    placeholder="Duração"
-                    value={duracaoMinutos}
-                    onChange={(event) =>
-                        setDuracaoMinutos(
-                            Number(
-                                event.target.value
-                            )
-                        )
-                    }
-                    required
-                />
-           
+        <div className="formulario-login__campo">
+            <label htmlFor="servico-preco">
+                Preço
+            </label>
 
-            
-                <input
-                    type="text"
-                    placeholder="Descrição"
-                    value={descricao}
-                    onChange={(event) =>
-                        setDescricao(
+            <input
+                id="servico-preco"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Preço"
+                value={preco}
+                onChange={(event) =>
+                    setPreco(
+                        Number(
                             event.target.value
                         )
-                    }
-                />
-           
+                    )
+                }
+                required
+            />
+        </div>
 
-
-            
+        <div className="formulario-login__campo">
+            <label className="formulario__checkbox">
                 <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="Preço"
-                    value={preco}
+                    type="checkbox"
+                    checked={ativo}
                     onChange={(event) =>
-                        setPreco(
-                            Number(
-                                event.target.value
-                            )
+                        setAtivo(
+                            event.target.checked
                         )
                     }
-                    required
                 />
-           
 
-            <div>
-                <label>
-                    <input
-                        type="checkbox"
-                        checked={ativo}
-                        onChange={(event) =>
-                            setAtivo(
-                                event.target.checked
-                            )
-                        }
-                    />
-
+                <span>
                     Serviço ativo
-                </label>
-            </div>
+                </span>
+            </label>
+        </div>
 
+        <div className="formulario-login__campo">
+            <label htmlFor="servico-disponibilidade">
+                Disponibilidade
+            </label>
 
-            <div>
-                
-
-                <select
-                    value={
-                        tipoDisponibilidade
-                    }
-                    onChange={(event) =>
-                        setTipoDisponibilidade(
-                            event.target.value as
-                                TipoDisponibilidadeServico
-                        )
-                    }
+            <select
+                id="servico-disponibilidade"
+                value={
+                    tipoDisponibilidade
+                }
+                onChange={(event) =>
+                    setTipoDisponibilidade(
+                        event.target.value as
+                            TipoDisponibilidadeServico
+                    )
+                }
+            >
+                <option
+                    value="TODOS_OS_DIAS"
                 >
-                    <option
-                        value="TODOS_OS_DIAS"
-                    >
-                        Todos os dias de funcionamento
-                    </option>
+                    Todos os dias de funcionamento
+                </option>
 
-                    <option
-                        value="DIAS_DA_SEMANA"
-                    >
-                        Dias específicos da semana
-                    </option>
-                </select>
-            </div>
+                <option
+                    value="DIAS_DA_SEMANA"
+                >
+                    Dias específicos da semana
+                </option>
+            </select>
+        </div>
 
-
-            {tipoDisponibilidade ===
-                "DIAS_DA_SEMANA" && (
-
-                <div>
-                    <p>
+        {tipoDisponibilidade ===
+            "DIAS_DA_SEMANA" && (
+            <div className="formulario-login__grupo">
+                <div className="formulario-login__grupo-cabecalho">
+                    <h3>
                         Dias disponíveis
-                    </p>
+                    </h3>
 
+                    <p>
+                        Selecione os dias da
+                        semana em que este
+                        serviço poderá ser
+                        agendado.
+                    </p>
+                </div>
+
+                <div className="formulario-login__dias-semana">
                     {diasDaSemana.map(
                         (dia) => (
-
                             <label
-                                key={dia.numero}
+                                key={
+                                    dia.numero
+                                }
+                                className="formulario__checkbox"  
                             >
                                 <input
                                     type="checkbox"
@@ -454,35 +500,56 @@ export function FormularioServico({
                                     }
                                 />
 
-                                {dia.nome}
+                                <span>
+                                    {dia.nome}
+                                </span>
                             </label>
                         )
                     )}
                 </div>
-            )}
-
-
-            <div>
+            </div>
+        )}
+    <br />
+    <br />
+        <div className="formulario-login__grupo">
+            <div className="formulario-login__grupo-cabecalho">
                 <h3>
                     Exceções por data
                 </h3>
 
                 <p>
-                    Use para liberar ou bloquear
-                    uma data específica.
+                    Use para liberar ou
+                    bloquear uma data
+                    específica.
                 </p>
+            </div>
+
+            <div className="formulario-login__campo">
+                <label htmlFor="servico-excecao-data">
+                    Data
+                </label>
 
                 <input
+                    id="servico-excecao-data"
                     type="date"
-                    value={novaDataExcecao}
+                    value={
+                        novaDataExcecao
+                    }
                     onChange={(event) =>
                         setNovaDataExcecao(
                             event.target.value
                         )
                     }
                 />
+            </div>
+
+            <div className="formulario-login__campo">
+                <label htmlFor="servico-excecao-status">
+                    Disponibilidade na data
+                </label>
 
                 <select
+                    id="servico-excecao-status"
                     value={
                         novaExcecaoDisponivel
                             ? "DISPONIVEL"
@@ -491,7 +558,7 @@ export function FormularioServico({
                     onChange={(event) =>
                         setNovaExcecaoDisponivel(
                             event.target.value ===
-                            "DISPONIVEL"
+                                "DISPONIVEL"
                         )
                     }
                 >
@@ -507,47 +574,65 @@ export function FormularioServico({
                         Bloqueado nesta data
                     </option>
                 </select>
-
-                <button
-                    type="button"
-                    onClick={
-                        adicionarExcecao
-                    }
-                >
-                    Adicionar exceção
-                </button>
             </div>
 
+            <button
+                type="button"
+                className="formulario-login__botao-secundario"
+                onClick={
+                    adicionarExcecao
+                }
+            >
+                Adicionar exceção
+            </button>
+        </div>
 
-            {excecoes.length > 0 && (
-
-                <div>
-                    <h4>
+        {excecoes.length > 0 && (
+            <div className="formulario-login__grupo">
+                <div className="formulario-login__grupo-cabecalho">
+                    <h3>
                         Exceções cadastradas
-                    </h4>
+                    </h3>
 
+                    <p>
+                        Datas com disponibilidade
+                        diferente da configuração
+                        padrão.
+                    </p>
+                </div>
+
+                <div className="formulario-login__excecoes">
                     {excecoes.map(
                         (excecao) => (
-
                             <div
                                 key={
                                     excecao.data
                                 }
+                                className="formulario-login__excecao"
                             >
-                                <span>
-                                    {excecao.data}
-                                </span>
+                                <div className="formulario-login__excecao-info">
+                                    <strong>
+                                        {
+                                            excecao.data
+                                        }
+                                    </strong>
 
-                                <span>
-                                    {" - "}
-
-                                    {excecao.disponivel
-                                        ? "Disponível"
-                                        : "Bloqueado"}
-                                </span>
+                                    <span
+                                        className={
+                                            excecao.disponivel
+                                                ? "formulario-login__excecao-status formulario-login__excecao-status--disponivel"
+                                                : "formulario-login__excecao-status formulario-login__excecao-status--bloqueado"
+                                        }
+                                    >
+                                        {excecao.disponivel
+                                            ? "Disponível"
+                                            : "Bloqueado"}
+                                    </span>
+                                </div>
 
                                 <button
                                     type="button"
+                                    className="formulario-login__remover"
                                     onClick={() =>
                                         removerExcecao(
                                             excecao.data
@@ -560,15 +645,17 @@ export function FormularioServico({
                         )
                     )}
                 </div>
-            )}
+            </div>
+        )}
 
-
-            <button type="submit">
-                {servico
-                    ? "Salvar alterações"
-                    : "Registrar"}
-            </button>
-
-        </form>
-    );
+        <button
+            type="submit"
+            className="formulario-login__botao"
+        >
+            {servico
+                ? "Salvar alterações"
+                : "Registrar serviço"}
+        </button>
+    </form>
+);
 }

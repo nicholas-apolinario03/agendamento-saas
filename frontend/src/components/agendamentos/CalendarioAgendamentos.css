@@ -248,16 +248,7 @@
     }
 }
 
-@media (max-width: 640px) {
-    .calendario-agendamentos {
-        padding: 14px;
-        overflow-x: auto;
-    }
 
-    .calendario-agendamentos .rdp-month_grid {
-        min-width: 820px;
-    }
-}
 .painel-dia {
     position: fixed;
     top: 0;
@@ -669,4 +660,113 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+}
+@media (max-width: 640px) {
+    .calendario-agendamentos {
+        width: 100%;
+        padding: 12px;
+        overflow-x: hidden;
+    }
+
+    .calendario-agendamentos__cabecalho {
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .calendario-agendamentos__legenda {
+        gap: 8px 12px;
+    }
+
+    .calendario-agendamentos__legenda > span {
+        font-size: 12px;
+    }
+
+    .calendario-agendamentos .rdp-month_grid {
+        width: 100%;
+        min-width: 0;
+        border-spacing: 3px;
+        table-layout: fixed;
+    }
+
+    .calendario-agendamentos .rdp-weekday {
+        padding: 6px 2px;
+        font-size: 11px;
+    }
+
+    .calendario-agendamentos .rdp-day {
+        width: calc(100% / 7);
+        height: 64px;
+    }
+
+    .calendario-agendamentos
+    .rdp-day_button.calendario-dia {
+        gap: 5px;
+        width: 100%;
+        height: 100%;
+        padding: 6px;
+
+        border-radius: 9px;
+    }
+
+    .calendario-dia__numero {
+        font-size: 12px;
+    }
+
+    /*
+     * No celular escondemos os textos
+     * dos agendamentos para evitar que
+     * cada célula fique larga.
+     */
+    .calendario-agendamento strong,
+    .calendario-agendamento > span:last-child {
+        display: none;
+    }
+
+    .calendario-dia__agendamentos {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .calendario-agendamento {
+        display: block;
+        width: auto;
+    }
+
+    .calendario-agendamento__status {
+        width: 7px;
+        height: 7px;
+    }
+
+    .calendario-dia__restantes {
+        display: none;
+    }
+
+    .calendario-agendamentos
+    .rdp-day_button.calendario-dia:hover {
+        transform: none;
+        box-shadow: none;
+    }
+}
+@media (max-width: 400px) {
+    .calendario-agendamentos {
+        padding: 8px;
+    }
+
+    .calendario-agendamentos .rdp-month_grid {
+        border-spacing: 2px;
+    }
+
+    .calendario-agendamentos .rdp-day {
+        height: 56px;
+    }
+
+    .calendario-agendamentos
+    .rdp-day_button.calendario-dia {
+        padding: 5px;
+    }
+
+    .calendario-dia__numero {
+        font-size: 11px;
+    }
 }

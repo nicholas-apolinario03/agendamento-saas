@@ -1,8 +1,5 @@
 import { Router } from "express";
-
-import {
-    processarMensagemWhatsApp
-} from "../service/processarMensagemWhatsApp";
+import {processarMensagemWhatsApp} from "../service/processarMensagemWhatsApp";
 
 const whatsappRoutes = Router();
 

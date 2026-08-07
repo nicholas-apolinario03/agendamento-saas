@@ -6,23 +6,50 @@ type CardHorarioProps = {
     aoEditar: (horariofun: HorarioFuncionamento) => void;
 }
 export function CardHorario({ horariofun, aoEditar, aoExcluir }: CardHorarioProps) {
-
+    var dia="";
+    switch(horariofun.diaSemana){
+        case  1:{
+            dia = "Segunda-Feira";
+            break;
+        }
+         case  2:{
+            dia = "Terça-Feira";
+               break;
+        }
+         case  3:{
+            dia = "Quarta-Feira";
+               break;
+        }
+         case  4:{
+            dia = "Quinta-Feira";
+               break;
+        }
+         case  5:{
+            dia = "Sexta-Feira";
+               break;
+        }
+         case  6:{
+            dia = "Sabado";
+               break;
+        }
+         case  7:{
+            dia = "Domingo";
+               break;
+        }
+        
+    }
     return (
 
         <div>
 
-            <h3>{horariofun.diaSemana}</h3>
+            <h3 className="titulo-servico_cabecalho" >{dia}</h3>
 
             <p>
-                {horariofun.horaInicio}
+                {horariofun.horaInicio}-{horariofun.horaFim}
             </p>
 
-            <p>
-                {horariofun.horaFim}
-            </p>
-
-            <button onClick={() => aoExcluir(horariofun.id)}>Deletar</button>
-            <button onClick={() => aoEditar(horariofun)}>Editar</button>
+            <button className="lista-botao_editar" onClick={() => aoEditar(horariofun)}>Editar</button>
+            <button className="lista-botao_excluir" onClick={() => aoExcluir(horariofun.id)}>Deletar</button>
 
             <hr />
 

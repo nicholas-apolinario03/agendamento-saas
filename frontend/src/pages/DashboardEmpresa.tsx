@@ -1,236 +1,152 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../services/api";
-
-import { ListaServicos } from "../components/ListarServicos";
-import { FormularioServico } from "../components/FormularioServico";
+import "../components/css/DashboardAgendamento.css"
 import IntegracaoWhatsApp from "../components/IntegracaoWhatsApp";
 
-import type {
-    NovoServico,
-    Servico
-} from "../types/Servico";
-
+import DashboardLayout from "../layouts/DashboardLayout";
+import { ListarHorarios } from "../components/ListarHorarios";
+import type { NovoHorario, HorarioFuncionamento } from "../types/HorarioFuncionamento";
+import { FormularioHorario } from "../components/FormularioHorario";
 
 export function DashboardEmpresa() {
 
-    const [servicos, setServicos] =
-        useState<Servico[]>([]);
 
-    const [mensagem, setMensagem] =
-        useState("");
+    const [horarios, setHorarios] = useState<HorarioFuncionamento[]>([]);
+    const [mensagem, setMensagem] = useState<string>("")
+    const [horarioEditando, setHorarioEditando] =
+        useState<HorarioFuncionamento | null>(null);
 
-    const [
-        servicoEditando,
-        setServicoEditando
-    ] = useState<Servico | null>(null);
+    async function buscarHorario() {
 
-
-    async function buscarServicos() {
-
-        const token =
-            localStorage.getItem("token");
 
         try {
 
-            const resposta =
-                await api.get(
-                    "empresa/servicos",
-                    {
-                        headers: {
-                            Authorization:
-                                `Bearer ${token}`
-                        }
-                    }
-                );
-
-            setServicos(resposta.data);
-
-        } catch (erro) {
-
-            console.error(
-                "Erro ao buscar serviços:",
-                erro
-            );
-
-            setMensagem(
-                "Erro ao buscar serviços"
-            );
-
-        }
-
-    }
-
-
-    useEffect(() => {
-        buscarServicos();
-    }, []);
-
-
-    async function excluirServico(
-        id: number
-    ) {
-
-        const token =
-            localStorage.getItem("token");
-
-        try {
-
-            await api.delete(
-                `empresa/servicos/${id}`,
+            const token = localStorage.getItem("token");
+            const resposta = await api.get("empresa/horarios",
                 {
                     headers: {
-                        Authorization:
-                            `Bearer ${token}`
+                        Authorization: `Bearer ${token}`
                     }
-                }
-            );
+                })
 
-            if (
-                servicoEditando?.id === id
-            ) {
-                setServicoEditando(null);
-            }
-
-            setMensagem(
-                "Serviço excluído com sucesso"
-            );
-
-            await buscarServicos();
-
-        } catch (erro: any) {
-
-            console.error(
-                "Erro ao excluir serviço:",
-                erro
-            );
-
-            setMensagem(
-                erro.response?.data?.erro ??
-                "Erro ao excluir serviço"
-            );
-
+            setHorarios(resposta.data)
+        } catch (erro) {
+            console.error(erro);
         }
 
     }
+    useEffect(() => {
+        buscarHorario();
+    }, [])
 
+    async function excluirHorario(id: number) {
 
-    function editarServico(
-        servico: Servico
-    ) {
-
-        setServicoEditando(servico);
-        setMensagem("");
-
-    }
-
-
-    function cancelarEdicao() {
-
-        setServicoEditando(null);
-        setMensagem("");
+        const token = localStorage.getItem("token");
+        await api.delete(`empresa/horarios/${id}`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        buscarHorario();
 
     }
+    function editarHorario(horario: HorarioFuncionamento) {
 
+        setHorarioEditando(horario);
 
-    async function salvarServico(
-        dados: NovoServico
-    ) {
+    }
+    async function salvarHorario(dados: NovoHorario) {
 
-        const token =
-            localStorage.getItem("token");
+        const token = localStorage.getItem("token");
 
-        try {
+        if (horarioEditando) {
+            try {
 
-            if (servicoEditando) {
-
-                await api.put(
-                    `empresa/servicos/${servicoEditando.id}`,
+                await api.put(`empresa/horarios/${horarioEditando.id}`,
                     dados,
                     {
                         headers: {
-                            Authorization:
-                                `Bearer ${token}`
+                            Authorization: `Bearer ${token}`
                         }
                     }
-                );
 
-                setMensagem(
-                    "Serviço atualizado com sucesso"
-                );
+                )
+                setMensagem("horario editado com sucesso");
 
-            } else {
+                await buscarHorario();
+                setHorarioEditando(null);
 
+            } catch (erro) {
+                console.error("erro ao editar");
+                console.error(erro);
+                setMensagem("erro ao editar")
+            }
+
+        } else {
+
+            try {
                 await api.post(
-                    "empresa/servicos",
+                    "empresa/horarios",
                     dados,
                     {
                         headers: {
-                            Authorization:
-                                `Bearer ${token}`
+                            Authorization: `Bearer ${token}`
                         }
                     }
                 );
 
-                setMensagem(
-                    "Serviço cadastrado com sucesso"
-                );
+                setMensagem("cadastro concluido com sucesso")
+
+                await buscarHorario();
+                setHorarioEditando(null);
+
+            } catch (erro: any) {
+
+                console.error("erro ao cadastrar");
+                console.error("Status:", erro.response?.status);
+                console.error("Resposta:", erro.response?.data);
+                console.error("Erro completo:", erro);
 
             }
 
-            setServicoEditando(null);
 
-            await buscarServicos();
-
-        } catch (erro: any) {
-
-            console.error(
-                "Erro ao salvar serviço:",
-                erro
-            );
-
-            setMensagem(
-                erro.response?.data?.erro ??
-                "Erro ao salvar serviço"
-            );
 
         }
 
+
     }
+
 
 
     return (
-        <div>
+        <DashboardLayout>
             <IntegracaoWhatsApp />
-            <FormularioServico
-                servico={servicoEditando}
-                onSalvar={salvarServico}
-            />
+            <div className="painel-gerenciamento__conteudo">
+
+                <section className="painel-gerenciamento__secao">
+                    <div className="painel-gerenciamento__formulario">
+                        <FormularioHorario
+                            horario={horarioEditando}
+                            onSalvar={salvarHorario}
+                        />
+                    </div>
+                    <div className="painel-gerenciamento__lista">
+                        <ListarHorarios
+
+                            horarios={horarios}
+                            aoEditar={editarHorario}
+                            aoExcluir={excluirHorario}
+
+                        />
+                    </div>
+                </section>
+            </div>
+            {mensagem && <p>{mensagem}</p>}
 
 
-            {servicoEditando && (
-                <button
-                    type="button"
-                    onClick={cancelarEdicao}
-                >
-                    Cancelar edição
-                </button>
-            )}
 
 
-            <ListaServicos
-                servicos={servicos}
-                aoExcluir={excluirServico}
-                aoEditar={editarServico}
-            />
-
-
-            {mensagem && (
-                <p>
-                    {mensagem}
-                </p>
-            )}
-
-        </div>
+        </DashboardLayout>
     );
 }

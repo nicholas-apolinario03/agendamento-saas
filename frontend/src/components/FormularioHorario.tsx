@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { HorarioFuncionamento, NovoHorario } from "../types/HorarioFuncionamento";
-
+import "./css/Formulario.css"
 type FormularioHorarioProps = {
     horario: HorarioFuncionamento | null;
     onSalvar: (dados: NovoHorario) => void;
@@ -66,27 +66,48 @@ export function FormularioHorario({
     return (
 
         <div>
-            <form onSubmit={cadastroHorario}>
-                <select
-                    value={diaSemana}
-                    onChange={(e) => setDiaSemana(Number(e.target.value))}
-                >
-                    {diasSemana.map((dia) => (
-                        <option key={dia.valor} value={dia.valor}>
-                            {dia.nome}
-                        </option>
-                    ))}
-                </select>
-                <input type="time" placeholder="hora de abertura" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
-                <input type="time" placeholder="hora de fechamento" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} />
-                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
-                <button type="submit">
+            <form onSubmit={cadastroHorario} className="formulario">
+                <div className="formulario-login__cabecalho">
+                    <h2>
+                        {horario
+                            ? "Editar Horario"
+                            : "Novo Horario"}
+                    </h2>
+
+                    <p>
+                        Configure os horarios de atendimento.
+                    </p>
+                </div>
+                <div className="formulario-login__campo">
+                    <select
+                        value={diaSemana}
+                        onChange={(e) => setDiaSemana(Number(e.target.value))}
+                    >
+                        {diasSemana.map((dia) => (
+                            <option key={dia.valor} value={dia.valor}>
+                                {dia.nome}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="formulario-login__campo">
+                    <input type="time" placeholder="hora de abertura" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                </div>
+                <div className="formulario-login__campo">
+                    <input type="time" placeholder="hora de fechamento" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} />
+                </div>
+                <div className="formulario-login__campo">
+                    <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
+                </div>
+
+                <button className="formulario-login__botao" type="submit">
 
                     {horario ? "Salvar Alterações" : "Cadastrar Horário"}
 
                 </button>
+
             </form>
-        </div>
+        </div >
     )
 
 

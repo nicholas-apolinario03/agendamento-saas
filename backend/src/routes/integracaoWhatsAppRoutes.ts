@@ -1,18 +1,8 @@
-import {
-    Router,
-} from "express";
+import {Router,} from "express";
+import {prisma} from "../lib/prisma";
+import {auth} from "../middleware/auth";
 
-import {
-    prisma,
-} from "../lib/prisma";
-
-import {
-    auth,
-} from "../middleware/auth";
-
-import {
-    concluirIntegracaoWhatsApp,
-} from "../service/integracaoWhatsapp";
+import {concluirIntegracaoWhatsApp,} from "../service/integracaoWhatsapp";
 
 const integracaoWhatsAppRoutes =
     Router();

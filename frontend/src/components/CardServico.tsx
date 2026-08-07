@@ -1,5 +1,5 @@
 import type { Servico } from "../types/Servico";
-
+import "./css/Lista.css"
 type CardServicoProps = {
     servico: Servico;
     aoEditar: (servico: Servico) => void;
@@ -32,31 +32,32 @@ export function CardServico({
     return (
         <div>
 
-            <h3>{servico.nome}</h3>
+            <h3 className="titulo-servico_cabecalho">{servico.nome}</h3>
+            <div>
+                <p>
+                    Duração: {servico.duracaoMinutos} minutos
+                </p>
+                <p>
+                    Descrição: {servico.descricao || "Sem descrição"}
+                </p>
 
-            <p>
-                Duração: {servico.duracaoMinutos} minutos
+                <p>
+                    Preço:{" "}
+                    {servico.preco.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                    })}
+                </p>
 
+                <p>
+                    Status: {servico.ativo ? "Ativo" : "Inativo"}
+                </p>
 
-                Descrição: {servico.descricao || "Sem descrição"}
+                <p>
+                    Disponibilidade: {disponibilidade}
 
-
-
-                Preço:{" "}
-                {servico.preco.toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                })}
-
-
-
-                Status: {servico.ativo ? "Ativo" : "Inativo"}
-
-
-
-                Disponibilidade: {disponibilidade}
-
-            </p>
+                </p>
+            </div>
             {servico.excecoes.length > 0 && (
                 <div>
                     <p>Exceções:</p>
@@ -75,14 +76,14 @@ export function CardServico({
                 </div>
             )}
 
-            <button
+            <button className="lista-botao_editar"
                 type="button"
                 onClick={() => aoEditar(servico)}
             >
                 Editar
             </button>
 
-            <button
+            <button className="lista-botao_excluir"
                 type="button"
                 onClick={() => aoExcluir(servico.id)}
             >

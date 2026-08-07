@@ -2,7 +2,7 @@ import {
     useEffect,
     useState,
 } from "react";
-
+import "../components/css/DashboardAgendamento.css"
 import CalendarioAgendamentos from
     "../components/agendamentos/CalendarioAgendamentos";
 import { ListaServicos } from "../components/ListarServicos";
@@ -22,12 +22,14 @@ import type {
 } from "../types/HorarioFuncionamento";
 
 import type {
-    Servico,NovoServico
+    Servico, NovoServico
 } from "../types/Servico";
 
 import {
     api,
 } from "../services/api";
+
+import DashboardLayout from "../layouts/DashboardLayout";
 
 export function DashboardAgendamento() {
     const [
@@ -39,7 +41,7 @@ export function DashboardAgendamento() {
         servicos,
         setServicos,
     ] = useState<Servico[]>([]);
-     const [
+    const [
         servicoEditando,
         setServicoEditando
     ] = useState<Servico | null>(null);
@@ -65,6 +67,17 @@ export function DashboardAgendamento() {
         setMensagem,
     ] = useState("");
 
+    type AbaGerenciamento =
+        | "SERVICOS"
+        | "CLIENTES";
+
+    const [
+        abaGerenciamento,
+        setAbaGerenciamento,
+    ] = useState<AbaGerenciamento>(
+        "SERVICOS"
+    );
+
     function obterToken() {
         return localStorage.getItem(
             "token"
@@ -77,7 +90,7 @@ export function DashboardAgendamento() {
                 `Bearer ${obterToken()}`,
         };
     }
-    
+
     async function buscarClientes() {
         try {
             const resposta =
@@ -166,16 +179,85 @@ export function DashboardAgendamento() {
         }
     }
     async function excluirServico(
-            id: number
-        ) {
-    
-            const token =
-                localStorage.getItem("token");
-    
-            try {
-    
-                await api.delete(
-                    `empresa/servicos/${id}`,
+        id: number
+    ) {
+
+        const token =
+            localStorage.getItem("token");
+
+        try {
+
+            await api.delete(
+                `empresa/servicos/${id}`,
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`
+                    }
+                }
+            );
+
+            if (
+                servicoEditando?.id === id
+            ) {
+                setServicoEditando(null);
+            }
+
+            setMensagem(
+                "Serviço excluído com sucesso"
+            );
+
+            await buscarServicos();
+
+        } catch (erro: any) {
+
+            console.error(
+                "Erro ao excluir serviço:",
+                erro
+            );
+
+            setMensagem(
+                erro.response?.data?.erro ??
+                "Erro ao excluir serviço"
+            );
+
+        }
+
+    }
+
+
+    function editarServico(
+        servico: Servico
+    ) {
+
+        setServicoEditando(servico);
+        setMensagem("");
+
+    }
+
+
+    function cancelarEdicao() {
+
+        setServicoEditando(null);
+        setMensagem("");
+
+    }
+
+
+    async function salvarServico(
+        dados: NovoServico
+    ) {
+
+        const token =
+            localStorage.getItem("token");
+
+        try {
+
+            if (servicoEditando) {
+
+                await api.put(
+                    `empresa/servicos/${servicoEditando.id}`,
+                    dados,
                     {
                         headers: {
                             Authorization:
@@ -183,118 +265,49 @@ export function DashboardAgendamento() {
                         }
                     }
                 );
-    
-                if (
-                    servicoEditando?.id === id
-                ) {
-                    setServicoEditando(null);
-                }
-    
+
                 setMensagem(
-                    "Serviço excluído com sucesso"
+                    "Serviço atualizado com sucesso"
                 );
-    
-                await buscarServicos();
-    
-            } catch (erro: any) {
-    
-                console.error(
-                    "Erro ao excluir serviço:",
-                    erro
+
+            } else {
+
+                await api.post(
+                    "empresa/servicos",
+                    dados,
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`
+                        }
+                    }
                 );
-    
+
                 setMensagem(
-                    erro.response?.data?.erro ??
-                    "Erro ao excluir serviço"
+                    "Serviço cadastrado com sucesso"
                 );
-    
+
             }
-    
-        }
-    
-    
-        function editarServico(
-            servico: Servico
-        ) {
-    
-            setServicoEditando(servico);
-            setMensagem("");
-    
-        }
-    
-    
-        function cancelarEdicao() {
-    
+
             setServicoEditando(null);
-            setMensagem("");
-    
+
+            await buscarServicos();
+
+        } catch (erro: any) {
+
+            console.error(
+                "Erro ao salvar serviço:",
+                erro
+            );
+
+            setMensagem(
+                erro.response?.data?.erro ??
+                "Erro ao salvar serviço"
+            );
+
         }
-    
-    
-        async function salvarServico(
-            dados: NovoServico
-        ) {
-    
-            const token =
-                localStorage.getItem("token");
-    
-            try {
-    
-                if (servicoEditando) {
-    
-                    await api.put(
-                        `empresa/servicos/${servicoEditando.id}`,
-                        dados,
-                        {
-                            headers: {
-                                Authorization:
-                                    `Bearer ${token}`
-                            }
-                        }
-                    );
-    
-                    setMensagem(
-                        "Serviço atualizado com sucesso"
-                    );
-    
-                } else {
-    
-                    await api.post(
-                        "empresa/servicos",
-                        dados,
-                        {
-                            headers: {
-                                Authorization:
-                                    `Bearer ${token}`
-                            }
-                        }
-                    );
-    
-                    setMensagem(
-                        "Serviço cadastrado com sucesso"
-                    );
-    
-                }
-    
-                setServicoEditando(null);
-    
-                await buscarServicos();
-    
-            } catch (erro: any) {
-    
-                console.error(
-                    "Erro ao salvar serviço:",
-                    erro
-                );
-    
-                setMensagem(
-                    erro.response?.data?.erro ??
-                    "Erro ao salvar serviço"
-                );
-    
-            }
-    
-        }
+
+    }
 
     useEffect(() => {
         void Promise.all([
@@ -306,48 +319,48 @@ export function DashboardAgendamento() {
     }, []);
 
     async function salvarNovoAgendamento(
-    dados: NovoAgendamento
-) {
-    try {
-        const resposta =
-            await api.post(
-                "empresa/agendamentos",
-                dados,
-                {
-                    headers:
-                        obterHeaders(),
-                }
+        dados: NovoAgendamento
+    ) {
+        try {
+            const resposta =
+                await api.post(
+                    "empresa/agendamentos",
+                    dados,
+                    {
+                        headers:
+                            obterHeaders(),
+                    }
+                );
+
+            setMensagem(
+                resposta.data.aviso ??
+                resposta.data.mensagem ??
+                (
+                    dados.confirmacao ===
+                        "EMAIL"
+                        ? "Agendamento criado aguardando confirmação."
+                        : "Agendamento criado com sucesso."
+                )
             );
 
-        setMensagem(
-            resposta.data.aviso ??
-            resposta.data.mensagem ??
-            (
-                dados.confirmacao ===
-                "EMAIL"
-                    ? "Agendamento criado aguardando confirmação."
-                    : "Agendamento criado com sucesso."
-            )
-        );
+            await buscarAgendamentos();
 
-        await buscarAgendamentos();
+            return true;
+        } catch (erro: any) {
+            console.error(
+                "Erro ao criar agendamento:",
+                erro
+            );
 
-        return true;
-    } catch (erro: any) {
-        console.error(
-            "Erro ao criar agendamento:",
-            erro
-        );
+            setMensagem(
+                erro.response?.data
+                    ?.erro ??
+                "Erro ao criar agendamento."
+            );
 
-        setMensagem(
-            erro.response?.data
-                ?.erro ??
-            "Erro ao criar agendamento."
-        );
-
-        return false;
+            return false;
+        }
     }
-}
 
     async function editarAgendamento(
         id: number,
@@ -426,69 +439,156 @@ export function DashboardAgendamento() {
     }
 
     return (
-        <main className="dashboard-agendamento">
-            <CalendarioAgendamentos
-                agendamentos={
-                    agendamentos
-                }
-                clientes={
-                    clientes
-                }
-                servicos={
-                    servicos
-                }
-                horarios={
-                    horarios
-                }
-                aoSalvarNovoAgendamento={
-                    salvarNovoAgendamento
-                }
-                aoEditarAgendamento={
-                    editarAgendamento
-                }
-                aoCancelarAgendamento={
-                    cancelarAgendamento
-                }
-            />
+        <DashboardLayout>
+            <main className="dashboard-agendamento">
 
-            {mensagem && (
-                <p className="dashboard-agendamento__mensagem">
-                    {mensagem}
-                </p>
-            )}
-            <div>
-             <FormularioServico
-                            servico={servicoEditando}
-                            onSalvar={salvarServico}
-                        />
-            
-            
-                        {servicoEditando && (
-                            <button
-                                type="button"
-                                onClick={cancelarEdicao}
-                            >
-                                Cancelar edição
-                            </button>
-                        )}
-            
-            
-                        <ListaServicos
-                            servicos={servicos}
-                            aoExcluir={excluirServico}
-                            aoEditar={editarServico}
-                        />
-            
-            
-                        {mensagem && (
+                <CalendarioAgendamentos
+                    agendamentos={
+                        agendamentos
+                    }
+                    clientes={
+                        clientes
+                    }
+                    servicos={
+                        servicos
+                    }
+                    horarios={
+                        horarios
+                    }
+                    aoSalvarNovoAgendamento={
+                        salvarNovoAgendamento
+                    }
+                    aoEditarAgendamento={
+                        editarAgendamento
+                    }
+                    aoCancelarAgendamento={
+                        cancelarAgendamento
+                    }
+                />
+
+                {mensagem && (
+                    <p className="dashboard-agendamento__mensagem">
+                        {mensagem}
+                    </p>
+                )}
+                <section className="painel-gerenciamento">
+                    <header className="painel-gerenciamento__cabecalho">
+                        <div>
+                            <h2>
+                                Gerenciamento
+                            </h2>
+
                             <p>
-                                {mensagem}
+                                Gerencie os serviços e clientes
+                                cadastrados na sua empresa.
                             </p>
+                        </div>
+                    </header>
+
+                    <nav
+                        className="painel-gerenciamento__abas"
+                        aria-label="Áreas de gerenciamento"
+                    >
+                        <button
+                            type="button"
+                            className={[
+                                "painel-gerenciamento__aba",
+                                abaGerenciamento ===
+                                    "SERVICOS"
+                                    ? "painel-gerenciamento__aba--ativa"
+                                    : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            onClick={() =>
+                                setAbaGerenciamento(
+                                    "SERVICOS"
+                                )
+                            }
+                        >
+                            Serviços
+                        </button>
+
+                        <button
+                            type="button"
+                            className={[
+                                "painel-gerenciamento__aba",
+                                abaGerenciamento ===
+                                    "CLIENTES"
+                                    ? "painel-gerenciamento__aba--ativa"
+                                    : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            onClick={() =>
+                                setAbaGerenciamento(
+                                    "CLIENTES"
+                                )
+                            }
+                        >
+                            Clientes
+                        </button>
+                    </nav>
+
+                    <div className="painel-gerenciamento__conteudo">
+                        {abaGerenciamento ===
+                            "SERVICOS" ? (
+                            <section className="painel-gerenciamento__secao">
+                                <div className="painel-gerenciamento__formulario">
+                                    <FormularioServico
+                                        servico={
+                                            servicoEditando
+                                        }
+                                        onSalvar={
+                                            salvarServico
+                                        }
+                                    />
+
+                                    {servicoEditando && (
+                                        <button
+                                            type="button"
+                                            className="painel-gerenciamento__cancelar"
+                                            onClick={
+                                                cancelarEdicao
+                                            }
+                                        >
+                                            Cancelar edição
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="painel-gerenciamento__lista">
+                                    <ListaServicos
+                                        servicos={
+                                            servicos
+                                        }
+                                        aoExcluir={
+                                            excluirServico
+                                        }
+                                        aoEditar={
+                                            editarServico
+                                        }
+                                    />
+                                </div>
+                            </section>
+                        ) : (
+                            <section className="painel-gerenciamento__vazio">
+                                <h3>
+                                    Gerenciamento de clientes
+                                </h3>
+
+                                <p>
+                                    O formulário e a lista de
+                                    clientes serão adicionados
+                                    nesta aba.
+                                </p>
+                            </section>
                         )}
-            
                     </div>
-        </main>
-        
-        
+                </section>
+            </main>
+        </DashboardLayout>
+
+
     );
 }

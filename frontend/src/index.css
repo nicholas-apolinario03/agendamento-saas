@@ -1,3 +1,12 @@
+:root{
+    --cor-botao: #000000;
+    --cor-botao-texto: #ffffff;
+    --cor-botao-excluir: #9f2d2d;
+     --cor-botao-editar: #0c5f8f;
+      --cor-botao-excluir-hover: #b44848;
+     --cor-botao-editar-hover: #297aa8;
+}
 *{
     margin: 0;
+    font-family: "Inter", sans-serif;
 }
