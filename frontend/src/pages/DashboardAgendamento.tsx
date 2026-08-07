@@ -1,33 +1,15 @@
-import {
-    useEffect,
-    useState,
-} from "react";
+import {useEffect,useState,} from "react";
+import {api,} from "../services/api";
 import "../components/css/DashboardAgendamento.css"
-import CalendarioAgendamentos from
-    "../components/agendamentos/CalendarioAgendamentos";
+
+import CalendarioAgendamentos from "../components/agendamentos/CalendarioAgendamentos";
 import { ListaServicos } from "../components/ListarServicos";
 import { FormularioServico } from "../components/FormularioServico";
 
-import type {
-    Agendamento,
-    NovoAgendamento,
-} from "../types/Agendamento";
-
-import type {
-    Cliente,
-} from "../types/Cliente";
-
-import type {
-    HorarioFuncionamento,
-} from "../types/HorarioFuncionamento";
-
-import type {
-    Servico, NovoServico
-} from "../types/Servico";
-
-import {
-    api,
-} from "../services/api";
+import type {Agendamento,NovoAgendamento,} from "../types/Agendamento";
+import type { Cliente,} from "../types/Cliente";
+import type { HorarioFuncionamento,} from "../types/HorarioFuncionamento";
+import type {Servico, NovoServico} from "../types/Servico";
 
 import DashboardLayout from "../layouts/DashboardLayout";
 
