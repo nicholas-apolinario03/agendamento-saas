@@ -446,7 +446,18 @@ empresaRoutes.post("/webhook/mercado-pago", async (req, res) => {
             return res.sendStatus(200);
         }
 
-       
+        const assinaturaMP = await buscarAssinaturaMercadoPago(
+            String(data.id)
+        );
+
+        console.log("Assinatura válida recebida");
+        console.log("ID:", assinaturaMP.id);
+        console.log("Status:", assinaturaMP.status);
+        console.log("Email:", assinaturaMP.payer_email);
+        console.log(
+            "Plano MP:",
+            assinaturaMP.preapproval_plan_id
+        );
 
         return res.sendStatus(200);
 
