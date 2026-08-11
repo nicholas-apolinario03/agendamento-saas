@@ -3,14 +3,12 @@ import bcrypt from "bcrypt";
 
 import {
     WebhookSignatureValidator,
-    InvalidWebhookSignatureError
-} from "mercadopago";
-
-import { prisma } from "../lib/prisma";
-import { auth } from "../middleware/auth";
-import { gerartoken } from "../service/jwt";
-
-import {
+    InvalidWebhookSignatureError,
+    } from "mercadopago";
+    import { prisma } from "../lib/prisma";
+    import { auth } from "../middleware/auth";
+    import { gerartoken } from "../service/jwt";
+    import {
     alterarValorAssinaturaMercadoPago,
     atualizarReferenciaAssinaturaMercadoPago,
     buscarAssinaturaMercadoPago,
@@ -19,8 +17,71 @@ import {
     cancelarAssinaturaMercadoPago,
     criarAssinaturaMercadoPago,
     criarPlanoMercadoPago,
-    fazerUpgradeAssinaturaMercadoPago
+    fazerUpgradeAssinaturaMercadoPago,
+    criarPagamentoUpgradeMercadoPago
 } from "../service/mercadoPago";
+
+
+function arredondarDinheiro(
+    valor: number
+): number {
+    return Math.round(
+        (valor + Number.EPSILON) * 100
+    ) / 100;
+}
+
+function calcularValorProporcionalUpgrade({
+    precoAtual,
+    precoNovo,
+    inicioCiclo,
+    fimCiclo
+}: {
+    precoAtual: number;
+    precoNovo: number;
+    inicioCiclo: Date;
+    fimCiclo: Date;
+}): number {
+    const agora =
+        new Date();
+
+    const duracaoTotal =
+        fimCiclo.getTime() -
+        inicioCiclo.getTime();
+
+    const tempoRestante =
+        Math.max(
+            0,
+            fimCiclo.getTime() -
+            agora.getTime()
+        );
+
+    if (
+        duracaoTotal <= 0 ||
+        tempoRestante <= 0
+    ) {
+        return 0;
+    }
+
+    const diferenca =
+        precoNovo -
+        precoAtual;
+
+    if (diferenca <= 0) {
+        return 0;
+    }
+
+    const proporcaoRestante =
+        Math.min(
+            1,
+            tempoRestante /
+                duracaoTotal
+        );
+
+    return arredondarDinheiro(
+        diferenca *
+            proporcaoRestante
+    );
+}
 
 const empresaRoutes = express.Router();
 
@@ -715,54 +776,75 @@ empresaRoutes.post(
                 // UPGRADE
                 // ----------------------------------------------
                 //
-                // O acesso ao novo plano é liberado imediatamente.
-                // A mesma assinatura do Mercado Pago é mantida;
-                // apenas o valor das próximas cobranças é alterado.
+                // Não alteramos plano nem cobrança recorrente aqui.
+                //
+                // Primeiro calculamos quanto falta pagar pelo
+                // restante do ciclo. O frontend abre o CardForm,
+                // gera um novo CardToken e chama /assinatura/upgrade.
                 //
                 if (
                     planoNovo.nivel >
                     assinatura.plano.nivel
                 ) {
-                    await fazerUpgradeAssinaturaMercadoPago({
-                        assinaturaId:
-                            assinatura
-                                .mercadoPagoAssinaturaId,
+                    if (
+                        !assinatura.inicioCiclo ||
+                        !assinatura.fimCiclo
+                    ) {
+                        return res.status(400).json({
+                            erro:
+                                "Ciclo atual da assinatura não está configurado"
+                        });
+                    }
 
-                        novoValor:
-                            Number(
-                                planoNovo.preco
-                            ),
+                    const valorProporcional =
+                        calcularValorProporcionalUpgrade({
+                            precoAtual:
+                                Number(
+                                    assinatura.plano.preco
+                                ),
 
-                        empresaId:
-                            usuario.empresaId,
+                            precoNovo:
+                                Number(
+                                    planoNovo.preco
+                                ),
 
-                        planoId:
-                            planoNovo.id
-                    });
+                            inicioCiclo:
+                                assinatura.inicioCiclo,
 
-                    await prisma.assinatura.update({
-                        where: {
-                            empresaId:
-                                usuario.empresaId
-                        },
-                        data: {
-                            planoId:
-                                planoNovo.id,
-
-                            proximoPlanoId:
-                                null
-                        }
-                    });
+                            fimCiclo:
+                                assinatura.fimCiclo
+                        });
 
                     return res.status(200).json({
                         acao:
-                            "UPGRADE_REALIZADO",
+                            "UPGRADE_PAGAMENTO",
 
-                        planoId:
-                            planoNovo.id,
+                        planoAtual: {
+                            id:
+                                assinatura.plano.id,
+                            nome:
+                                assinatura.plano.nome,
+                            preco:
+                                Number(
+                                    assinatura.plano.preco
+                                )
+                        },
 
-                        plano:
-                            planoNovo.nome
+                        planoNovo: {
+                            id:
+                                planoNovo.id,
+                            nome:
+                                planoNovo.nome,
+                            preco:
+                                Number(
+                                    planoNovo.preco
+                                )
+                        },
+
+                        valorProporcional,
+
+                        fimCiclo:
+                            assinatura.fimCiclo
                     });
                 }
             }
@@ -802,6 +884,322 @@ empresaRoutes.post(
                 erro:
                     erro.response?.data?.message ||
                     "Erro ao processar alteração de plano"
+            });
+        }
+    }
+);
+
+// ======================================================
+// UPGRADE COM COBRANÇA PROPORCIONAL
+// ======================================================
+
+empresaRoutes.post(
+    "/assinatura/upgrade",
+    auth,
+    async (req, res) => {
+        try {
+            const usuario =
+                (req as any).usuario;
+
+            const {
+                planoId,
+                cardTokenId,
+                paymentMethodId,
+                installments,
+                issuerId
+            } = req.body;
+
+            if (
+                !planoId ||
+                typeof planoId !== "number"
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Plano inválido"
+                });
+            }
+
+            if (
+                !cardTokenId ||
+                typeof cardTokenId !== "string"
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Token do cartão não informado"
+                });
+            }
+
+            if (
+                !paymentMethodId ||
+                typeof paymentMethodId !== "string"
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Meio de pagamento não informado"
+                });
+            }
+
+            const numeroParcelas =
+                Number(installments);
+
+            if (
+                !Number.isInteger(
+                    numeroParcelas
+                ) ||
+                numeroParcelas < 1
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Número de parcelas inválido"
+                });
+            }
+
+            const assinatura =
+                await prisma.assinatura.findUnique({
+                    where: {
+                        empresaId:
+                            usuario.empresaId
+                    },
+                    include: {
+                        plano: true
+                    }
+                });
+
+            if (!assinatura) {
+                return res.status(404).json({
+                    erro:
+                        "Assinatura não encontrada"
+                });
+            }
+
+            if (
+                assinatura.status !== "ATIVA"
+            ) {
+                return res.status(409).json({
+                    erro:
+                        "A assinatura precisa estar ativa para fazer upgrade"
+                });
+            }
+
+            if (
+                assinatura.cancelamentoAgendado
+            ) {
+                return res.status(409).json({
+                    erro:
+                        "A renovação desta assinatura está cancelada"
+                });
+            }
+
+            if (
+                !assinatura
+                    .mercadoPagoAssinaturaId
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Assinatura Mercado Pago não encontrada"
+                });
+            }
+
+            if (
+                !assinatura.inicioCiclo ||
+                !assinatura.fimCiclo
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Ciclo atual da assinatura não configurado"
+                });
+            }
+
+            const planoNovo =
+                await prisma.plano.findUnique({
+                    where: {
+                        id:
+                            planoId
+                    }
+                });
+
+            if (
+                !planoNovo ||
+                !planoNovo.ativo
+            ) {
+                return res.status(404).json({
+                    erro:
+                        "Plano não encontrado"
+                });
+            }
+
+            if (
+                planoNovo.nivel <=
+                assinatura.plano.nivel
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "O plano escolhido não é um upgrade"
+                });
+            }
+
+            /*
+             * Recalculamos no backend. Nunca confiamos no
+             * valor proporcional informado pelo frontend.
+             */
+            const valorProporcional =
+                calcularValorProporcionalUpgrade({
+                    precoAtual:
+                        Number(
+                            assinatura.plano.preco
+                        ),
+
+                    precoNovo:
+                        Number(
+                            planoNovo.preco
+                        ),
+
+                    inicioCiclo:
+                        assinatura.inicioCiclo,
+
+                    fimCiclo:
+                        assinatura.fimCiclo
+                });
+
+            let pagamentoMP: any =
+                null;
+
+            /*
+             * Se restar menos de R$ 0,01 após arredondamento,
+             * não há valor útil para cobrar.
+             */
+            if (
+                valorProporcional >= 0.01
+            ) {
+                pagamentoMP =
+                    await criarPagamentoUpgradeMercadoPago({
+                        cardTokenId,
+
+                        valor:
+                            valorProporcional,
+
+                        paymentMethodId,
+
+                        installments:
+                            numeroParcelas,
+
+                        issuerId,
+
+                        email:
+                            usuario.email,
+
+                        empresaId:
+                            usuario.empresaId,
+
+                        planoAtualId:
+                            assinatura.planoId,
+
+                        planoNovoId:
+                            planoNovo.id
+                    });
+
+                if (
+                    pagamentoMP.status !==
+                    "approved"
+                ) {
+                    return res.status(402).json({
+                        erro:
+                            "A cobrança proporcional do upgrade não foi aprovada",
+
+                        status:
+                            pagamentoMP.status,
+
+                        statusDetail:
+                            pagamentoMP.status_detail
+                    });
+                }
+            }
+
+            /*
+             * Só depois da cobrança proporcional aprovada
+             * alteramos a assinatura recorrente.
+             *
+             * O início e o fim do ciclo NÃO mudam.
+             */
+            await fazerUpgradeAssinaturaMercadoPago({
+                assinaturaId:
+                    assinatura
+                        .mercadoPagoAssinaturaId,
+
+                novoValor:
+                    Number(
+                        planoNovo.preco
+                    ),
+
+                empresaId:
+                    usuario.empresaId,
+
+                planoId:
+                    planoNovo.id
+            });
+
+            await prisma.assinatura.update({
+                where: {
+                    empresaId:
+                        usuario.empresaId
+                },
+                data: {
+                    planoId:
+                        planoNovo.id,
+
+                    proximoPlanoId:
+                        null
+                }
+            });
+
+            return res.status(200).json({
+                sucesso: true,
+
+                acao:
+                    "UPGRADE_REALIZADO",
+
+                plano: {
+                    id:
+                        planoNovo.id,
+                    nome:
+                        planoNovo.nome,
+                    preco:
+                        Number(
+                            planoNovo.preco
+                        )
+                },
+
+                valorCobrado:
+                    valorProporcional,
+
+                pagamentoId:
+                    pagamentoMP?.id
+                        ? String(
+                            pagamentoMP.id
+                        )
+                        : null,
+
+                inicioCiclo:
+                    assinatura.inicioCiclo,
+
+                fimCiclo:
+                    assinatura.fimCiclo
+            });
+
+        } catch (erro: any) {
+            console.error(
+                "Erro no upgrade proporcional:",
+                erro.response?.data ||
+                    erro.message ||
+                    erro
+            );
+
+            return res.status(
+                erro.response?.status || 500
+            ).json({
+                erro:
+                    erro.response?.data?.message ||
+                    "Erro ao realizar upgrade"
             });
         }
     }

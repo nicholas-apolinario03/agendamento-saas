@@ -4,11 +4,21 @@ import {
     useState
 } from "react";
 
-import { useNavigate } from "react-router-dom";
-import { loadMercadoPago } from "@mercadopago/sdk-js";
+import {
+    useNavigate
+} from "react-router-dom";
 
-import { api } from "../services/api";
-import { verificarSessao } from "../utils/auth";
+import {
+    loadMercadoPago
+} from "@mercadopago/sdk-js";
+
+import {
+    api
+} from "../services/api";
+
+import {
+    verificarSessao
+} from "../utils/auth";
 
 declare global {
     interface Window {
@@ -27,50 +37,103 @@ type AcaoAssinatura =
     | "AGENDADO_APOS_TRIAL"
     | "ESCOLHER_INICIO"
     | "DOWNGRADE_AGENDADO"
-    | "UPGRADE"
-    | "UPGRADE_REALIZADO"
+    | "UPGRADE_PAGAMENTO"
     | "NOVA_ASSINATURA";
 
 type RespostaAssinatura = {
     acao?: AcaoAssinatura;
     erro?: string;
+
+    valorProporcional?: number;
+    fimCiclo?: string;
+
+    planoAtual?: {
+        id: number;
+        nome: string;
+        preco: number;
+    };
+
+    planoNovo?: {
+        id: number;
+        nome: string;
+        preco: number;
+    };
+};
+
+type PagamentoPendente = {
+    tipo:
+        | "NOVA_ASSINATURA"
+        | "UPGRADE";
+
+    plano: Plano;
+
+    valor: number;
+
+    fimCiclo?: string;
 };
 
 export default function Planos() {
-    const navigate = useNavigate();
+    const navigate =
+        useNavigate();
 
-    const [planos, setPlanos] =
-        useState<Plano[]>([]);
+    const [
+        planos,
+        setPlanos
+    ] = useState<Plano[]>([]);
 
-    const [carregando, setCarregando] =
-        useState(true);
+    const [
+        carregando,
+        setCarregando
+    ] = useState(true);
 
-    const [processandoPlanoId, setProcessandoPlanoId] =
-        useState<number | null>(null);
+    const [
+        processandoPlanoId,
+        setProcessandoPlanoId
+    ] = useState<
+        number | null
+    >(null);
 
-    const [planoPagamento, setPlanoPagamento] =
-        useState<Plano | null>(null);
+    const [
+        pagamentoPendente,
+        setPagamentoPendente
+    ] = useState<
+        PagamentoPendente | null
+    >(null);
 
-    const [mensagemPagamento, setMensagemPagamento] =
-        useState("");
+    const [
+        mensagemPagamento,
+        setMensagemPagamento
+    ] = useState("");
 
     const cardFormRef =
         useRef<any>(null);
+
+    // ==================================================
+    // PLANOS
+    // ==================================================
 
     useEffect(() => {
         async function buscarPlanos() {
             try {
                 const resposta =
-                    await api.get("/planos");
+                    await api.get(
+                        "/planos"
+                    );
 
-                setPlanos(resposta.data);
+                setPlanos(
+                    resposta.data
+                );
+
             } catch (erro) {
                 console.error(
                     "Erro ao buscar planos:",
                     erro
                 );
+
             } finally {
-                setCarregando(false);
+                setCarregando(
+                    false
+                );
             }
         }
 
@@ -78,21 +141,25 @@ export default function Planos() {
     }, []);
 
     // ==================================================
-    // MERCADO PAGO CARD FORM
+    // CARDFORM MERCADO PAGO
     // ==================================================
 
     useEffect(() => {
-        if (!planoPagamento) {
+        if (!pagamentoPendente) {
             return;
         }
 
-        const planoSelecionado = planoPagamento;
+        const pagamento =
+            pagamentoPendente;
 
-        let cancelado = false;
+        let cancelado =
+            false;
 
         async function iniciarMercadoPago() {
             try {
-                setMensagemPagamento("");
+                setMensagemPagamento(
+                    ""
+                );
 
                 const publicKey =
                     import.meta.env
@@ -117,20 +184,27 @@ export default function Planos() {
                     new window.MercadoPago(
                         publicKey,
                         {
-                            locale: "pt-BR"
+                            locale:
+                                "pt-BR"
                         }
                     );
 
                 cardFormRef.current =
                     mp.cardForm({
+                        /*
+                         * Para nova assinatura:
+                         * valor integral do plano.
+                         *
+                         * Para upgrade:
+                         * somente diferença proporcional.
+                         */
                         amount:
                             String(
-                                Number(
-                                    planoSelecionado.preco
-                                )
+                                pagamento.valor
                             ),
 
-                        iframe: true,
+                        iframe:
+                            true,
 
                         form: {
                             id:
@@ -139,6 +213,7 @@ export default function Planos() {
                             cardNumber: {
                                 id:
                                     "form-checkout__cardNumber",
+
                                 placeholder:
                                     "Número do cartão"
                             },
@@ -146,6 +221,7 @@ export default function Planos() {
                             expirationDate: {
                                 id:
                                     "form-checkout__expirationDate",
+
                                 placeholder:
                                     "MM/AA"
                             },
@@ -153,6 +229,7 @@ export default function Planos() {
                             securityCode: {
                                 id:
                                     "form-checkout__securityCode",
+
                                 placeholder:
                                     "CVV"
                             },
@@ -160,6 +237,7 @@ export default function Planos() {
                             cardholderName: {
                                 id:
                                     "form-checkout__cardholderName",
+
                                 placeholder:
                                     "Nome como está no cartão"
                             },
@@ -167,6 +245,7 @@ export default function Planos() {
                             issuer: {
                                 id:
                                     "form-checkout__issuer",
+
                                 placeholder:
                                     "Banco emissor"
                             },
@@ -174,6 +253,7 @@ export default function Planos() {
                             installments: {
                                 id:
                                     "form-checkout__installments",
+
                                 placeholder:
                                     "Parcelas"
                             },
@@ -181,6 +261,7 @@ export default function Planos() {
                             identificationType: {
                                 id:
                                     "form-checkout__identificationType",
+
                                 placeholder:
                                     "Tipo de documento"
                             },
@@ -188,6 +269,7 @@ export default function Planos() {
                             identificationNumber: {
                                 id:
                                     "form-checkout__identificationNumber",
+
                                 placeholder:
                                     "CPF"
                             },
@@ -195,6 +277,7 @@ export default function Planos() {
                             cardholderEmail: {
                                 id:
                                     "form-checkout__cardholderEmail",
+
                                 placeholder:
                                     "E-mail"
                             }
@@ -216,145 +299,228 @@ export default function Planos() {
                                 }
                             },
 
-                            onSubmit: async (
-                                event: Event
-                            ) => {
-                                event.preventDefault();
+                            onSubmit:
+                                async (
+                                    event: Event
+                                ) => {
+                                    event.preventDefault();
 
-                                const submit =
-                                    document.getElementById(
-                                        "form-checkout__submit"
-                                    ) as HTMLButtonElement | null;
+                                    const botao =
+                                        document.getElementById(
+                                            "form-checkout__submit"
+                                        ) as HTMLButtonElement | null;
 
-                                try {
-                                    if (submit) {
-                                        submit.disabled =
-                                            true;
-                                    }
+                                    try {
+                                        if (botao) {
+                                            botao.disabled =
+                                                true;
+                                        }
 
-                                    setMensagemPagamento(
-                                        "Processando assinatura..."
-                                    );
-
-                                    const dados =
-                                        cardFormRef.current
-                                            .getCardFormData();
-
-                                    const cardTokenId =
-                                        dados.token;
-
-                                    if (!cardTokenId) {
-                                        throw new Error(
-                                            "Mercado Pago não gerou o token do cartão"
-                                        );
-                                    }
-
-                                    const token =
-                                        localStorage.getItem(
-                                            "token"
-                                        );
-
-                                    if (!token) {
-                                        navigate(
-                                            "/login"
-                                        );
-                                        return;
-                                    }
-
-                                    const resposta =
-                                        await api.post(
-                                            "/assinatura/checkout",
-                                            {
-                                                planoId:
-                                                    planoSelecionado.id,
-
-                                                /*
-                                                 * ÚNICO dado relacionado ao
-                                                 * cartão enviado ao backend.
-                                                 */
-                                                cardTokenId
-                                            },
-                                            {
-                                                headers: {
-                                                    Authorization:
-                                                        `Bearer ${token}`
-                                                }
-                                            }
-                                        );
-
-                                    if (
-                                        resposta.data
-                                            ?.status ===
-                                        "authorized"
-                                    ) {
                                         setMensagemPagamento(
-                                            "Assinatura ativada com sucesso!"
+                                            pagamento.tipo ===
+                                                "UPGRADE"
+                                                ? "Processando cobrança proporcional..."
+                                                : "Processando assinatura..."
                                         );
 
-                                        setTimeout(() => {
-                                            navigate(
-                                                "/dashboard"
+                                        const dados =
+                                            cardFormRef.current
+                                                .getCardFormData();
+
+                                        const cardTokenId =
+                                            dados.token;
+
+                                        const paymentMethodId =
+                                            dados.paymentMethodId;
+
+                                        const installments =
+                                            Number(
+                                                dados.installments ||
+                                                    1
                                             );
-                                        }, 1200);
 
-                                        return;
+                                        const issuerId =
+                                            dados.issuerId;
+
+                                        if (!cardTokenId) {
+                                            throw new Error(
+                                                "Mercado Pago não gerou o token do cartão"
+                                            );
+                                        }
+
+                                        const token =
+                                            localStorage.getItem(
+                                                "token"
+                                            );
+
+                                        if (!token) {
+                                            navigate(
+                                                "/login"
+                                            );
+
+                                            return;
+                                        }
+
+                                        if (
+                                            pagamento.tipo ===
+                                            "UPGRADE"
+                                        ) {
+                                            if (
+                                                !paymentMethodId
+                                            ) {
+                                                throw new Error(
+                                                    "Mercado Pago não informou o meio de pagamento"
+                                                );
+                                            }
+
+                                            const resposta =
+                                                await api.post(
+                                                    "/assinatura/upgrade",
+
+                                                    {
+                                                        planoId:
+                                                            pagamento
+                                                                .plano
+                                                                .id,
+
+                                                        cardTokenId,
+
+                                                        paymentMethodId,
+
+                                                        installments,
+
+                                                        issuerId
+                                                    },
+
+                                                    {
+                                                        headers: {
+                                                            Authorization:
+                                                                `Bearer ${token}`
+                                                        }
+                                                    }
+                                                );
+
+                                            setMensagemPagamento(
+                                                `Upgrade realizado! Foi cobrado R$ ${Number(
+                                                    resposta.data
+                                                        .valorCobrado
+                                                )
+                                                    .toFixed(
+                                                        2
+                                                    )
+                                                    .replace(
+                                                        ".",
+                                                        ","
+                                                    )} referente ao restante do ciclo.`
+                                            );
+
+                                            setTimeout(
+                                                () => {
+                                                    navigate(
+                                                        "/dashboard"
+                                                    );
+                                                },
+                                                1500
+                                            );
+
+                                            return;
+                                        }
+
+                                        const resposta =
+                                            await api.post(
+                                                "/assinatura/checkout",
+
+                                                {
+                                                    planoId:
+                                                        pagamento
+                                                            .plano
+                                                            .id,
+
+                                                    cardTokenId
+                                                },
+
+                                                {
+                                                    headers: {
+                                                        Authorization:
+                                                            `Bearer ${token}`
+                                                    }
+                                                }
+                                            );
+
+                                        if (
+                                            resposta.data
+                                                ?.status ===
+                                            "authorized"
+                                        ) {
+                                            setMensagemPagamento(
+                                                "Assinatura ativada com sucesso!"
+                                            );
+
+                                            setTimeout(
+                                                () => {
+                                                    navigate(
+                                                        "/dashboard"
+                                                    );
+                                                },
+                                                1200
+                                            );
+
+                                            return;
+                                        }
+
+                                        setMensagemPagamento(
+                                            "Assinatura criada. Aguardando confirmação do Mercado Pago."
+                                        );
+
+                                    } catch (
+                                        erro: any
+                                    ) {
+                                        console.error(
+                                            "Erro no pagamento:",
+                                            erro
+                                        );
+
+                                        setMensagemPagamento(
+                                            erro.response
+                                                ?.data
+                                                ?.erro ||
+                                            erro.message ||
+                                            "Não foi possível processar o pagamento."
+                                        );
+
+                                    } finally {
+                                        if (botao) {
+                                            botao.disabled =
+                                                false;
+                                        }
                                     }
+                                },
 
-                                    setMensagemPagamento(
-                                        "Assinatura criada. Aguardando confirmação do Mercado Pago."
-                                    );
-                                } catch (erro: any) {
-                                    console.error(
-                                        "Erro no pagamento:",
-                                        erro
-                                    );
+                            onFetching:
+                                () => {
+                                    const progress =
+                                        document.querySelector(
+                                            ".progress-bar"
+                                        ) as HTMLProgressElement | null;
 
-                                    setMensagemPagamento(
-                                        erro.response
-                                            ?.data
-                                            ?.erro ||
-                                        erro.message ||
-                                        "Não foi possível criar a assinatura."
-                                    );
-
-                                    /*
-                                     * CardToken é de uso único.
-                                     * Em caso de falha na criação da
-                                     * assinatura, o usuário deve enviar
-                                     * novamente o formulário para que
-                                     * o SDK gere um novo token.
-                                     */
-                                } finally {
-                                    if (submit) {
-                                        submit.disabled =
-                                            false;
-                                    }
-                                }
-                            },
-
-                            onFetching: () => {
-                                const progress =
-                                    document.querySelector(
-                                        ".progress-bar"
-                                    ) as HTMLProgressElement | null;
-
-                                if (progress) {
-                                    progress.removeAttribute(
-                                        "value"
-                                    );
-                                }
-
-                                return () => {
                                     if (progress) {
-                                        progress.setAttribute(
-                                            "value",
-                                            "0"
+                                        progress.removeAttribute(
+                                            "value"
                                         );
                                     }
-                                };
-                            }
+
+                                    return () => {
+                                        if (progress) {
+                                            progress.setAttribute(
+                                                "value",
+                                                "0"
+                                            );
+                                        }
+                                    };
+                                }
                         }
                     });
+
             } catch (erro) {
                 console.error(
                     "Erro ao iniciar Mercado Pago:",
@@ -370,31 +536,43 @@ export default function Planos() {
         iniciarMercadoPago();
 
         return () => {
-            cancelado = true;
-            cardFormRef.current = null;
+            cancelado =
+                true;
+
+            cardFormRef.current =
+                null;
         };
+
     }, [
-        planoPagamento,
+        pagamentoPendente,
         navigate
     ]);
 
     // ==================================================
-    // SELEÇÃO DO PLANO
+    // ESCOLHER PLANO
     // ==================================================
 
     async function assinarPlano(
         plano: Plano
     ): Promise<void> {
         if (!verificarSessao()) {
-            navigate("/cadastro");
+            navigate(
+                "/cadastro"
+            );
+
             return;
         }
 
         const token =
-            localStorage.getItem("token");
+            localStorage.getItem(
+                "token"
+            );
 
         if (!token) {
-            navigate("/login");
+            navigate(
+                "/login"
+            );
+
             return;
         }
 
@@ -406,10 +584,12 @@ export default function Planos() {
             const resposta =
                 await api.post<RespostaAssinatura>(
                     "/assinatura/criar",
+
                     {
                         planoId:
                             plano.id
                     },
+
                     {
                         headers: {
                             Authorization:
@@ -421,7 +601,9 @@ export default function Planos() {
             const dados =
                 resposta.data;
 
-            switch (dados.acao) {
+            switch (
+                dados.acao
+            ) {
                 case "AGENDADO_APOS_TRIAL":
                     alert(
                         "Plano escolhido! Ele ficou agendado para após o período gratuito."
@@ -435,44 +617,90 @@ export default function Planos() {
                         );
 
                     if (ativarAgora) {
-                        setPlanoPagamento(
-                            plano
-                        );
+                        setPagamentoPendente({
+                            tipo:
+                                "NOVA_ASSINATURA",
+
+                            plano,
+
+                            valor:
+                                Number(
+                                    plano.preco
+                                )
+                        });
                     }
+
                     break;
                 }
 
                 case "DOWNGRADE_AGENDADO":
                     alert(
-                        "Seu novo plano será aplicado no próximo ciclo."
+                        "Downgrade agendado. Seu plano atual continua até o fim do ciclo e o plano menor entra na próxima renovação."
                     );
                     break;
 
-                case "UPGRADE":
-                    /*
-                     * Compatibilidade com resposta antiga.
-                     * O backend atualizado já executa o upgrade
-                     * e retorna UPGRADE_REALIZADO.
-                     */
-                    alert(
-                        "Não foi possível concluir o upgrade automaticamente. Atualize a página e tente novamente."
-                    );
-                    break;
+                case "UPGRADE_PAGAMENTO": {
+                    const valor =
+                        Number(
+                            dados.valorProporcional ||
+                                0
+                        );
 
-                case "UPGRADE_REALIZADO":
-                    alert(
-                        "Upgrade realizado com sucesso! O novo plano já está disponível."
-                    );
+                    const dataFim =
+                        dados.fimCiclo
+                            ? new Date(
+                                dados.fimCiclo
+                            ).toLocaleDateString(
+                                "pt-BR"
+                            )
+                            : "fim do ciclo atual";
 
-                    navigate(
-                        "/dashboard"
-                    );
+                    const confirmar =
+                        window.confirm(
+                            `O upgrade será liberado imediatamente. Será cobrada agora a diferença proporcional de R$ ${valor
+                                .toFixed(2)
+                                .replace(
+                                    ".",
+                                    ","
+                                )}. A próxima renovação será de R$ ${Number(
+                                plano.preco
+                            )
+                                .toFixed(2)
+                                .replace(
+                                    ".",
+                                    ","
+                                )} em ${dataFim}. Deseja continuar?`
+                        );
+
+                    if (confirmar) {
+                        setPagamentoPendente({
+                            tipo:
+                                "UPGRADE",
+
+                            plano,
+
+                            valor,
+
+                            fimCiclo:
+                                dados.fimCiclo
+                        });
+                    }
+
                     break;
+                }
 
                 case "NOVA_ASSINATURA":
-                    setPlanoPagamento(
-                        plano
-                    );
+                    setPagamentoPendente({
+                        tipo:
+                            "NOVA_ASSINATURA",
+
+                        plano,
+
+                        valor:
+                            Number(
+                                plano.preco
+                            )
+                    });
                     break;
 
                 default:
@@ -481,16 +709,22 @@ export default function Planos() {
                             "Não foi possível selecionar o plano."
                     );
             }
-        } catch (erro: any) {
+
+        } catch (
+            erro: any
+        ) {
             console.error(
                 "Erro ao selecionar plano:",
                 erro
             );
 
             alert(
-                erro.response?.data?.erro ||
+                erro.response
+                    ?.data
+                    ?.erro ||
                     "Não foi possível selecionar o plano."
             );
+
         } finally {
             setProcessandoPlanoId(
                 null
@@ -512,91 +746,152 @@ export default function Planos() {
                 Escolha seu plano
             </h1>
 
-            {planos.map((plano) => (
-                <div key={plano.id}>
-                    <h2>
-                        {plano.nome}
-                    </h2>
-
-                    <p>
-                        R${" "}
-                        {Number(
-                            plano.preco
-                        )
-                            .toFixed(2)
-                            .replace(
-                                ".",
-                                ","
-                            )}
-                        /mês
-                    </p>
-
-                    <p>
-                        Até{" "}
-                        {
-                            plano.limiteAgendamentos
-                        }{" "}
-                        agendamentos por mês
-                    </p>
-
-                    <button
-                        disabled={
-                            processandoPlanoId !==
-                            null
-                        }
-                        onClick={() =>
-                            assinarPlano(
-                                plano
-                            )
+            {planos.map(
+                (plano) => (
+                    <div
+                        key={
+                            plano.id
                         }
                     >
-                        {processandoPlanoId ===
-                        plano.id
-                            ? "Processando..."
-                            : `Assinar ${plano.nome}`}
-                    </button>
-                </div>
-            ))}
+                        <h2>
+                            {
+                                plano.nome
+                            }
+                        </h2>
 
-            {planoPagamento && (
+                        <p>
+                            R${" "}
+                            {Number(
+                                plano.preco
+                            )
+                                .toFixed(
+                                    2
+                                )
+                                .replace(
+                                    ".",
+                                    ","
+                                )}
+                            /mês
+                        </p>
+
+                        <p>
+                            Até{" "}
+                            {
+                                plano.limiteAgendamentos
+                            }{" "}
+                            agendamentos
+                            por mês
+                        </p>
+
+                        <button
+                            disabled={
+                                processandoPlanoId !==
+                                null
+                            }
+
+                            onClick={() =>
+                                assinarPlano(
+                                    plano
+                                )
+                            }
+                        >
+                            {processandoPlanoId ===
+                            plano.id
+                                ? "Processando..."
+                                : `Assinar ${plano.nome}`}
+                        </button>
+                    </div>
+                )
+            )}
+
+            {pagamentoPendente && (
                 <section>
                     <hr />
 
                     <h2>
-                        Pagamento —{" "}
-                        {
-                            planoPagamento.nome
-                        }
+                        {pagamentoPendente.tipo ===
+                        "UPGRADE"
+                            ? `Upgrade para ${pagamentoPendente.plano.nome}`
+                            : `Pagamento — ${pagamentoPendente.plano.nome}`}
                     </h2>
 
-                    <p>
-                        R${" "}
-                        {Number(
-                            planoPagamento.preco
-                        )
-                            .toFixed(2)
-                            .replace(
-                                ".",
-                                ","
-                            )}
-                        /mês
-                    </p>
+                    {pagamentoPendente.tipo ===
+                    "UPGRADE" ? (
+                        <>
+                            <p>
+                                Cobrança
+                                proporcional
+                                agora:{" "}
+                                <strong>
+                                    R${" "}
+                                    {Number(
+                                        pagamentoPendente.valor
+                                    )
+                                        .toFixed(
+                                            2
+                                        )
+                                        .replace(
+                                            ".",
+                                            ","
+                                        )}
+                                </strong>
+                            </p>
+
+                            <p>
+                                Próximas
+                                renovações: R${" "}
+                                {Number(
+                                    pagamentoPendente
+                                        .plano
+                                        .preco
+                                )
+                                    .toFixed(
+                                        2
+                                    )
+                                    .replace(
+                                        ".",
+                                        ","
+                                    )}
+                                /mês
+                            </p>
+                        </>
+                    ) : (
+                        <p>
+                            R${" "}
+                            {Number(
+                                pagamentoPendente.valor
+                            )
+                                .toFixed(
+                                    2
+                                )
+                                .replace(
+                                    ".",
+                                    ","
+                                )}
+                            /mês
+                        </p>
+                    )}
 
                     <p>
-                        Os dados sensíveis do
-                        cartão são processados
-                        pelo Mercado Pago.
+                        Os dados sensíveis
+                        do cartão são
+                        processados pelo
+                        Mercado Pago.
                     </p>
 
                     <form
-                        id="form-checkout"
+                        id=
+                            "form-checkout"
                     >
                         <label>
                             Número do cartão
                         </label>
+
                         <div
-                            id="form-checkout__cardNumber"
-                            className="container"
+                            id=
+                                "form-checkout__cardNumber"
+                            className=
+                                "container"
                             style={{
                                 minHeight:
                                     "38px"
@@ -606,9 +901,12 @@ export default function Planos() {
                         <label>
                             Validade
                         </label>
+
                         <div
-                            id="form-checkout__expirationDate"
-                            className="container"
+                            id=
+                                "form-checkout__expirationDate"
+                            className=
+                                "container"
                             style={{
                                 minHeight:
                                     "38px"
@@ -618,9 +916,12 @@ export default function Planos() {
                         <label>
                             CVV
                         </label>
+
                         <div
-                            id="form-checkout__securityCode"
-                            className="container"
+                            id=
+                                "form-checkout__securityCode"
+                            className=
+                                "container"
                             style={{
                                 minHeight:
                                     "38px"
@@ -630,59 +931,82 @@ export default function Planos() {
                         <label>
                             Nome no cartão
                         </label>
+
                         <input
-                            type="text"
-                            id="form-checkout__cardholderName"
+                            type=
+                                "text"
+                            id=
+                                "form-checkout__cardholderName"
                         />
 
                         <label>
                             Banco emissor
                         </label>
+
                         <select
-                            id="form-checkout__issuer"
+                            id=
+                                "form-checkout__issuer"
                         />
 
                         <label>
                             Parcelas
                         </label>
+
                         <select
-                            id="form-checkout__installments"
+                            id=
+                                "form-checkout__installments"
                         />
 
                         <label>
                             Documento
                         </label>
+
                         <select
-                            id="form-checkout__identificationType"
+                            id=
+                                "form-checkout__identificationType"
                         />
 
                         <input
-                            type="text"
-                            id="form-checkout__identificationNumber"
-                            placeholder="CPF"
+                            type=
+                                "text"
+                            id=
+                                "form-checkout__identificationNumber"
+                            placeholder=
+                                "CPF"
                         />
 
                         <label>
                             E-mail
                         </label>
+
                         <input
-                            type="email"
-                            id="form-checkout__cardholderEmail"
+                            type=
+                                "email"
+                            id=
+                                "form-checkout__cardholderEmail"
                         />
 
                         <button
-                            type="submit"
-                            id="form-checkout__submit"
+                            type=
+                                "submit"
+                            id=
+                                "form-checkout__submit"
                         >
-                            Confirmar assinatura
+                            {pagamentoPendente.tipo ===
+                            "UPGRADE"
+                                ? "Pagar diferença e fazer upgrade"
+                                : "Confirmar assinatura"}
                         </button>
 
                         <button
-                            type="button"
+                            type=
+                                "button"
+
                             onClick={() => {
-                                setPlanoPagamento(
+                                setPagamentoPendente(
                                     null
                                 );
+
                                 setMensagemPagamento(
                                     ""
                                 );
@@ -693,7 +1017,8 @@ export default function Planos() {
 
                         <progress
                             value="0"
-                            className="progress-bar"
+                            className=
+                                "progress-bar"
                         >
                             Carregando...
                         </progress>

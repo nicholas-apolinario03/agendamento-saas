@@ -1,4 +1,5 @@
 import axios from "axios";
+import { randomUUID } from "crypto";
 
 const mercadoPagoApi = axios.create({
     baseURL: "https://api.mercadopago.com",
@@ -237,6 +238,98 @@ export async function cancelarAssinaturaMercadoPago(
             status: "canceled"
         }
     );
+
+    return resposta.data;
+}
+
+
+// ======================================================
+// COBRANÇA PROPORCIONAL DE UPGRADE
+// ======================================================
+
+type CriarPagamentoUpgradeMercadoPago = {
+    cardTokenId: string;
+    valor: number;
+    paymentMethodId: string;
+    installments: number;
+    issuerId?: string | number;
+    email: string;
+    empresaId: number;
+    planoAtualId: number;
+    planoNovoId: number;
+};
+
+/**
+ * Faz uma cobrança avulsa referente SOMENTE à diferença
+ * proporcional do upgrade.
+ *
+ * O cartão é tokenizado no frontend pelo MercadoPago.js.
+ * Número do cartão, validade e CVV não chegam ao backend.
+ */
+export async function criarPagamentoUpgradeMercadoPago({
+    cardTokenId,
+    valor,
+    paymentMethodId,
+    installments,
+    issuerId,
+    email,
+    empresaId,
+    planoAtualId,
+    planoNovoId
+}: CriarPagamentoUpgradeMercadoPago) {
+    const payerEmail =
+        process.env.MERCADO_PAGO_TEST_PAYER_EMAIL ||
+        email;
+
+    const body: any = {
+        transaction_amount: valor,
+
+        token:
+            cardTokenId,
+
+        description:
+            "Upgrade de assinatura NewerisBook",
+
+        installments,
+
+        payment_method_id:
+            paymentMethodId,
+
+        payer: {
+            email:
+                payerEmail
+        },
+
+        external_reference:
+            `NEWERIS_UPGRADE_EMPRESA_${empresaId}_DE_${planoAtualId}_PARA_${planoNovoId}`,
+
+        /*
+         * Para o upgrade precisamos de uma resposta final
+         * imediatamente: approved ou rejected.
+         */
+        binary_mode: true
+    };
+
+    if (
+        issuerId !== undefined &&
+        issuerId !== null &&
+        String(issuerId).length > 0
+    ) {
+        body.issuer_id =
+            issuerId;
+    }
+
+    const resposta =
+        await mercadoPagoApi.post(
+            "/v1/payments",
+            body,
+            {
+                headers: {
+                    "X-Idempotency-Key":
+                        randomUUID()
+                }
+            }
+        );
 
     return resposta.data;
 }
