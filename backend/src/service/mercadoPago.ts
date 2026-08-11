@@ -87,7 +87,7 @@ export async function criarAssinaturaMercadoPago({
                 planoMercadoPagoId,
 
             payer_email:
-                email,
+                process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || email,
 
             card_token_id:
                 cardTokenId,
