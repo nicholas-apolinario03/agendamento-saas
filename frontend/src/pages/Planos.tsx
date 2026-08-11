@@ -1,8 +1,20 @@
-import { useEffect, useState } from "react";
+import {
+    useEffect,
+    useRef,
+    useState
+} from "react";
+
 import { useNavigate } from "react-router-dom";
+import { loadMercadoPago } from "@mercadopago/sdk-js";
 
 import { api } from "../services/api";
 import { verificarSessao } from "../utils/auth";
+
+declare global {
+    interface Window {
+        MercadoPago: any;
+    }
+}
 
 type Plano = {
     id: number;
@@ -35,6 +47,19 @@ export default function Planos() {
     const [processandoPlanoId, setProcessandoPlanoId] =
         useState<number | null>(null);
 
+    const [planoPagamento, setPlanoPagamento] =
+        useState<Plano | null>(null);
+
+    const [mensagemPagamento, setMensagemPagamento] =
+        useState("");
+
+    const cardFormRef =
+        useRef<any>(null);
+
+    // ==================================================
+    // BUSCAR PLANOS
+    // ==================================================
+
     useEffect(() => {
         async function buscarPlanos() {
             try {
@@ -56,56 +81,305 @@ export default function Planos() {
     }, []);
 
     // ==================================================
-    // CHECKOUT
+    // MERCADO PAGO CARD FORM
     // ==================================================
 
-    async function abrirCheckout(
-        planoId: number
-    ): Promise<void> {
-        const token =
-            localStorage.getItem("token");
-
-        if (!token) {
-            navigate("/login");
+    useEffect(() => {
+        if (!planoPagamento) {
             return;
         }
 
-        const resposta = await api.post(
-            "/assinatura/checkout",
-            {
-                planoId
-            },
-            {
-                headers: {
-                    Authorization:
-                        `Bearer ${token}`
+        /*
+         * Fazemos uma cópia depois da validação
+         * para o TypeScript entender que não é null.
+         */
+        const planoSelecionado = planoPagamento;
+
+        let cancelado = false;
+
+        async function iniciarMercadoPago() {
+            try {
+                setMensagemPagamento("");
+
+                const publicKey =
+                    import.meta.env
+                        .VITE_MERCADO_PAGO_PUBLIC_KEY;
+
+                if (!publicKey) {
+                    throw new Error(
+                        "VITE_MERCADO_PAGO_PUBLIC_KEY não configurada"
+                    );
                 }
+
+                await loadMercadoPago();
+
+                if (
+                    cancelado ||
+                    !window.MercadoPago
+                ) {
+                    return;
+                }
+
+                const mp =
+                    new window.MercadoPago(
+                        publicKey,
+                        {
+                            locale: "pt-BR"
+                        }
+                    );
+
+                cardFormRef.current =
+                    mp.cardForm({
+                        amount:
+                            String(
+                                Number(
+                                    planoSelecionado.preco
+                                )
+                            ),
+
+                        iframe: true,
+
+                        form: {
+                            id:
+                                "form-checkout",
+
+                            cardNumber: {
+                                id:
+                                    "form-checkout__cardNumber",
+                                placeholder:
+                                    "Número do cartão"
+                            },
+
+                            expirationDate: {
+                                id:
+                                    "form-checkout__expirationDate",
+                                placeholder:
+                                    "MM/AA"
+                            },
+
+                            securityCode: {
+                                id:
+                                    "form-checkout__securityCode",
+                                placeholder:
+                                    "CVV"
+                            },
+
+                            cardholderName: {
+                                id:
+                                    "form-checkout__cardholderName",
+                                placeholder:
+                                    "Nome como está no cartão"
+                            },
+
+                            issuer: {
+                                id:
+                                    "form-checkout__issuer",
+                                placeholder:
+                                    "Banco emissor"
+                            },
+
+                            installments: {
+                                id:
+                                    "form-checkout__installments",
+                                placeholder:
+                                    "Parcelas"
+                            },
+
+                            identificationType: {
+                                id:
+                                    "form-checkout__identificationType",
+                                placeholder:
+                                    "Tipo de documento"
+                            },
+
+                            identificationNumber: {
+                                id:
+                                    "form-checkout__identificationNumber",
+                                placeholder:
+                                    "CPF"
+                            },
+
+                            cardholderEmail: {
+                                id:
+                                    "form-checkout__cardholderEmail",
+                                placeholder:
+                                    "E-mail"
+                            }
+                        },
+
+                        callbacks: {
+                            onFormMounted: (
+                                error: any
+                            ) => {
+                                if (error) {
+                                    console.error(
+                                        "Erro ao montar CardForm:",
+                                        error
+                                    );
+
+                                    setMensagemPagamento(
+                                        "Não foi possível carregar o formulário de pagamento."
+                                    );
+                                }
+                            },
+
+                            onSubmit: async (
+                                event: Event
+                            ) => {
+                                event.preventDefault();
+
+                                const submit =
+                                    document.getElementById(
+                                        "form-checkout__submit"
+                                    ) as HTMLButtonElement | null;
+
+                                try {
+                                    if (submit) {
+                                        submit.disabled =
+                                            true;
+                                    }
+
+                                    setMensagemPagamento(
+                                        "Processando assinatura..."
+                                    );
+
+                                    const dados =
+                                        cardFormRef.current
+                                            .getCardFormData();
+
+                                    const cardTokenId =
+                                        dados.token;
+
+                                    if (!cardTokenId) {
+                                        throw new Error(
+                                            "Mercado Pago não gerou o token do cartão"
+                                        );
+                                    }
+
+                                    const token =
+                                        localStorage.getItem(
+                                            "token"
+                                        );
+
+                                    if (!token) {
+                                        navigate(
+                                            "/login"
+                                        );
+                                        return;
+                                    }
+
+                                    const resposta =
+                                        await api.post(
+                                            "/assinatura/checkout",
+                                            {
+                                                planoId:
+                                                    planoSelecionado.id,
+
+                                                cardTokenId
+                                            },
+                                            {
+                                                headers: {
+                                                    Authorization:
+                                                        `Bearer ${token}`
+                                                }
+                                            }
+                                        );
+
+                                    if (
+                                        resposta.data
+                                            ?.status ===
+                                        "authorized"
+                                    ) {
+                                        setMensagemPagamento(
+                                            "Assinatura ativada com sucesso!"
+                                        );
+
+                                        setTimeout(() => {
+                                            navigate(
+                                                "/dashboard"
+                                            );
+                                        }, 1200);
+
+                                        return;
+                                    }
+
+                                    setMensagemPagamento(
+                                        "Assinatura criada. Aguardando confirmação do Mercado Pago."
+                                    );
+                                } catch (erro: any) {
+                                    console.error(
+                                        "Erro no pagamento:",
+                                        erro
+                                    );
+
+                                    setMensagemPagamento(
+                                        erro.response
+                                            ?.data
+                                            ?.erro ||
+                                        erro.message ||
+                                        "Não foi possível criar a assinatura."
+                                    );
+                                } finally {
+                                    if (submit) {
+                                        submit.disabled =
+                                            false;
+                                    }
+                                }
+                            },
+
+                            onFetching: () => {
+                                const progress =
+                                    document.querySelector(
+                                        ".progress-bar"
+                                    ) as HTMLProgressElement | null;
+
+                                if (progress) {
+                                    progress.removeAttribute(
+                                        "value"
+                                    );
+                                }
+
+                                return () => {
+                                    if (progress) {
+                                        progress.setAttribute(
+                                            "value",
+                                            "0"
+                                        );
+                                    }
+                                };
+                            }
+                        }
+                    });
+            } catch (erro) {
+                console.error(
+                    "Erro ao iniciar Mercado Pago:",
+                    erro
+                );
+
+                setMensagemPagamento(
+                    "Não foi possível carregar o Mercado Pago."
+                );
             }
-        );
-
-        const checkoutUrl =
-            resposta.data.checkoutUrl;
-
-        if (!checkoutUrl) {
-            throw new Error(
-                "URL do checkout não recebida"
-            );
         }
 
-        /*
-         * Essa URL agora é o init_point da assinatura
-         * individual criada no backend, e não mais
-         * o init_point genérico do plano.
-         */
-        window.location.href = checkoutUrl;
-    }
+        iniciarMercadoPago();
+
+        return () => {
+            cancelado = true;
+
+            cardFormRef.current = null;
+        };
+    }, [
+        planoPagamento,
+        navigate
+    ]);
 
     // ==================================================
-    // SELEÇÃO DE PLANO
+    // SELEÇÃO DO PLANO
     // ==================================================
 
     async function assinarPlano(
-        planoId: number
+        plano: Plano
     ): Promise<void> {
         if (!verificarSessao()) {
             navigate("/cadastro");
@@ -121,13 +395,16 @@ export default function Planos() {
         }
 
         try {
-            setProcessandoPlanoId(planoId);
+            setProcessandoPlanoId(
+                plano.id
+            );
 
             const resposta =
                 await api.post<RespostaAssinatura>(
                     "/assinatura/criar",
                     {
-                        planoId
+                        planoId:
+                            plano.id
                     },
                     {
                         headers: {
@@ -137,7 +414,8 @@ export default function Planos() {
                     }
                 );
 
-            const dados = resposta.data;
+            const dados =
+                resposta.data;
 
             switch (dados.acao) {
                 case "AGENDADO_APOS_TRIAL":
@@ -146,19 +424,20 @@ export default function Planos() {
                     );
                     break;
 
-                case "ESCOLHER_INICIO":
-                    /*
-                     * Seu backend já diferencia esse caso,
-                     * mas o modal "agora ou após o trial"
-                     * ainda não existe.
-                     *
-                     * Por enquanto, mantemos o comportamento
-                     * original sem cobrar automaticamente.
-                     */
-                    alert(
-                        "Você pode ativar esse plano agora ou após o período gratuito. A escolha de início ainda precisa ser implementada."
-                    );
+                case "ESCOLHER_INICIO": {
+                    const ativarAgora =
+                        window.confirm(
+                            "Deseja ativar esse plano agora? Ao continuar, o Mercado Pago solicitará os dados do cartão e a assinatura começará imediatamente."
+                        );
+
+                    if (ativarAgora) {
+                        setPlanoPagamento(
+                            plano
+                        );
+                    }
+
                     break;
+                }
 
                 case "DOWNGRADE_AGENDADO":
                     alert(
@@ -167,19 +446,18 @@ export default function Planos() {
                     break;
 
                 case "UPGRADE":
-                    await abrirCheckout(planoId);
+                    alert(
+                        "O upgrade de uma assinatura ativa será feito alterando a assinatura existente. Essa etapa será implementada separadamente para evitar cobrança duplicada."
+                    );
                     break;
 
                 case "NOVA_ASSINATURA":
-                    await abrirCheckout(planoId);
+                    setPlanoPagamento(
+                        plano
+                    );
                     break;
 
                 default:
-                    console.error(
-                        "Ação desconhecida:",
-                        dados
-                    );
-
                     alert(
                         dados.erro ||
                             "Não foi possível selecionar o plano."
@@ -193,45 +471,73 @@ export default function Planos() {
 
             alert(
                 erro.response?.data?.erro ||
-                    "Não foi possível iniciar a assinatura."
+                    "Não foi possível selecionar o plano."
             );
         } finally {
-            setProcessandoPlanoId(null);
+            setProcessandoPlanoId(
+                null
+            );
         }
     }
 
+    // ==================================================
+    // LOADING
+    // ==================================================
+
     if (carregando) {
-        return <p>Carregando planos...</p>;
+        return (
+            <p>
+                Carregando planos...
+            </p>
+        );
     }
+
+    // ==================================================
+    // TELA
+    // ==================================================
 
     return (
         <main>
-            <h1>Escolha seu plano</h1>
+            <h1>
+                Escolha seu plano
+            </h1>
 
             {planos.map((plano) => (
                 <div key={plano.id}>
-                    <h2>{plano.nome}</h2>
+                    <h2>
+                        {plano.nome}
+                    </h2>
 
                     <p>
                         R${" "}
-                        {Number(plano.preco)
+                        {Number(
+                            plano.preco
+                        )
                             .toFixed(2)
-                            .replace(".", ",")}
+                            .replace(
+                                ".",
+                                ","
+                            )}
                         /mês
                     </p>
 
                     <p>
                         Até{" "}
-                        {plano.limiteAgendamentos}{" "}
+                        {
+                            plano.limiteAgendamentos
+                        }{" "}
                         agendamentos por mês
                     </p>
 
                     <button
                         disabled={
-                            processandoPlanoId !== null
+                            processandoPlanoId !==
+                            null
                         }
                         onClick={() =>
-                            assinarPlano(plano.id)
+                            assinarPlano(
+                                plano
+                            )
                         }
                     >
                         {processandoPlanoId ===
@@ -241,6 +547,164 @@ export default function Planos() {
                     </button>
                 </div>
             ))}
+
+            {planoPagamento && (
+                <section>
+                    <hr />
+
+                    <h2>
+                        Pagamento —{" "}
+                        {
+                            planoPagamento.nome
+                        }
+                    </h2>
+
+                    <p>
+                        R${" "}
+                        {Number(
+                            planoPagamento.preco
+                        )
+                            .toFixed(2)
+                            .replace(
+                                ".",
+                                ","
+                            )}
+                        /mês
+                    </p>
+
+                    <p>
+                        Os dados sensíveis do cartão são processados pelo Mercado Pago.
+                    </p>
+
+                    <form
+                        id="form-checkout"
+                    >
+                        <label>
+                            Número do cartão
+                        </label>
+
+                        <div
+                            id="form-checkout__cardNumber"
+                            className="container"
+                            style={{
+                                minHeight:
+                                    "38px"
+                            }}
+                        />
+
+                        <label>
+                            Validade
+                        </label>
+
+                        <div
+                            id="form-checkout__expirationDate"
+                            className="container"
+                            style={{
+                                minHeight:
+                                    "38px"
+                            }}
+                        />
+
+                        <label>
+                            CVV
+                        </label>
+
+                        <div
+                            id="form-checkout__securityCode"
+                            className="container"
+                            style={{
+                                minHeight:
+                                    "38px"
+                            }}
+                        />
+
+                        <label>
+                            Nome no cartão
+                        </label>
+
+                        <input
+                            type="text"
+                            id="form-checkout__cardholderName"
+                        />
+
+                        <label>
+                            Banco emissor
+                        </label>
+
+                        <select
+                            id="form-checkout__issuer"
+                        />
+
+                        <label>
+                            Parcelas
+                        </label>
+
+                        <select
+                            id="form-checkout__installments"
+                        />
+
+                        <label>
+                            Documento
+                        </label>
+
+                        <select
+                            id="form-checkout__identificationType"
+                        />
+
+                        <input
+                            type="text"
+                            id="form-checkout__identificationNumber"
+                            placeholder="CPF"
+                        />
+
+                        <label>
+                            E-mail
+                        </label>
+
+                        <input
+                            type="email"
+                            id="form-checkout__cardholderEmail"
+                        />
+
+                        <button
+                            type="submit"
+                            id="form-checkout__submit"
+                        >
+                            Confirmar assinatura
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setPlanoPagamento(
+                                    null
+                                );
+
+                                setMensagemPagamento(
+                                    ""
+                                );
+                            }}
+                        >
+                            Cancelar
+                        </button>
+
+                        <progress
+                            value="0"
+                            className="progress-bar"
+                        >
+                            Carregando...
+                        </progress>
+                    </form>
+
+                    {mensagemPagamento && (
+                        <p>
+                            {
+                                mensagemPagamento
+                            }
+                        </p>
+                    )}
+                </section>
+            )}
         </main>
     );
 }

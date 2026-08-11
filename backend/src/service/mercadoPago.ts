@@ -23,22 +23,24 @@ export async function criarPlanoMercadoPago({
     preco,
     referencia
 }: CriarPlanoMercadoPago) {
-    const resposta = await mercadoPagoApi.post("/preapproval_plan", {
-        reason: nome,
+    const resposta = await mercadoPagoApi.post(
+        "/preapproval_plan",
+        {
+            reason: nome,
 
-        // Identifica o plano no nosso sistema.
-        // Não identifica a empresa que fará a assinatura.
-        external_reference: referencia,
+            external_reference: referencia,
 
-        auto_recurring: {
-            frequency: 1,
-            frequency_type: "months",
-            transaction_amount: preco,
-            currency_id: "BRL"
-        },
+            auto_recurring: {
+                frequency: 1,
+                frequency_type: "months",
+                transaction_amount: preco,
+                currency_id: "BRL"
+            },
 
-        back_url: `${process.env.FRONTEND_URL}/dashboard`
-    });
+            back_url:
+                `${process.env.FRONTEND_URL}/dashboard`
+        }
+    );
 
     return resposta.data;
 }
@@ -57,43 +59,54 @@ export async function buscarPlanoMercadoPago(
 // ASSINATURAS
 // ======================================================
 
-type CriarAssinaturaPendenteMercadoPago = {
+type CriarAssinaturaMercadoPago = {
     planoMercadoPagoId: string;
+    cardTokenId: string;
     empresaId: number;
     planoId: number;
     email: string;
 };
 
 /**
- * Cria uma assinatura individual no Mercado Pago.
+ * Cria uma assinatura individual associada ao plano.
  *
- * O ponto mais importante deste fluxo é o external_reference:
- *
- * NEWERIS_EMPRESA_10_PLANO_2
- *
- * Quando o Mercado Pago enviar o webhook, buscamos a assinatura
- * e recuperamos essa referência para descobrir qual empresa e
- * qual plano devem ser atualizados no nosso banco.
+ * Os dados reais do cartão NÃO chegam neste serviço.
+ * O frontend usa MercadoPago.js e envia somente o CardToken.
  */
-export async function criarAssinaturaPendenteMercadoPago({
+export async function criarAssinaturaMercadoPago({
     planoMercadoPagoId,
+    cardTokenId,
     empresaId,
     planoId,
     email
-}: CriarAssinaturaPendenteMercadoPago) {
-    const resposta = await mercadoPagoApi.post("/preapproval", {
-        preapproval_plan_id: planoMercadoPagoId,
+}: CriarAssinaturaMercadoPago) {
+    const resposta = await mercadoPagoApi.post(
+        "/preapproval",
+        {
+            preapproval_plan_id:
+                planoMercadoPagoId,
 
-        payer_email: email,
+            payer_email:
+                email,
 
-        external_reference:
-            `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
+            card_token_id:
+                cardTokenId,
 
-        back_url:
-            `${process.env.FRONTEND_URL}/dashboard`,
+            external_reference:
+                `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
 
-        status: "pending"
-    });
+            back_url:
+                `${process.env.FRONTEND_URL}/dashboard`,
+
+            /*
+             * Para assinatura associada a um plano,
+             * o Mercado Pago exige status authorized
+             * quando card_token_id é enviado.
+             */
+            status:
+                "authorized"
+        }
+    );
 
     return resposta.data;
 }

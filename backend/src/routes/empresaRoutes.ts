@@ -12,7 +12,7 @@ import { gerartoken } from "../service/jwt";
 
 import {
     buscarAssinaturaMercadoPago,
-    criarAssinaturaPendenteMercadoPago,
+    criarAssinaturaMercadoPago,
     criarPlanoMercadoPago
 } from "../service/mercadoPago";
 
@@ -553,7 +553,7 @@ empresaRoutes.post(
 );
 
 // ======================================================
-// CHECKOUT
+// CHECKOUT / CRIAÇÃO DA ASSINATURA
 // ======================================================
 
 empresaRoutes.post(
@@ -564,7 +564,10 @@ empresaRoutes.post(
             const usuario =
                 (req as any).usuario;
 
-            const { planoId } = req.body;
+            const {
+                planoId,
+                cardTokenId
+            } = req.body;
 
             if (
                 !planoId ||
@@ -572,6 +575,26 @@ empresaRoutes.post(
             ) {
                 return res.status(400).json({
                     erro: "Plano inválido"
+                });
+            }
+
+            if (
+                !cardTokenId ||
+                typeof cardTokenId !== "string"
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Token do cartão não informado"
+                });
+            }
+
+            if (
+                !usuario?.empresaId ||
+                !usuario?.email
+            ) {
+                return res.status(401).json({
+                    erro:
+                        "Usuário autenticado inválido"
                 });
             }
 
@@ -616,6 +639,28 @@ empresaRoutes.post(
                 });
             }
 
+            /*
+             * SEGURANÇA CONTRA COBRANÇA DUPLA:
+             *
+             * Uma empresa que já possui assinatura ativa
+             * não deve criar uma nova preapproval para fazer
+             * upgrade. Isso poderia deixar duas assinaturas
+             * recorrentes ativas simultaneamente.
+             */
+            if (
+                assinatura.status === "ATIVA"
+            ) {
+                return res.status(409).json({
+                    erro:
+                        "Já existe uma assinatura ativa. O upgrade deve alterar a assinatura atual."
+                });
+            }
+
+            /*
+             * Guarda a intenção local antes da chamada externa.
+             * O plano só vira planoId atual depois que o Mercado
+             * Pago confirmar a assinatura como authorized.
+             */
             await prisma.assinatura.update({
                 where: {
                     empresaId:
@@ -628,50 +673,149 @@ empresaRoutes.post(
             });
 
             /*
-             * Cria uma assinatura individual no Mercado Pago.
+             * O backend recebe apenas o CardToken.
              *
-             * mercadoPago.ts deve montar:
-             *
-             * NEWERIS_EMPRESA_<empresaId>_PLANO_<planoId>
-             *
-             * no external_reference.
+             * Número do cartão, validade e CVV são tratados
+             * pelo MercadoPago.js no navegador.
              */
             const assinaturaMP =
-                await criarAssinaturaPendenteMercadoPago({
+                await criarAssinaturaMercadoPago({
                     planoMercadoPagoId:
                         plano.mercadoPagoPlanoId,
+
+                    cardTokenId,
+
                     empresaId:
                         usuario.empresaId,
+
                     planoId:
                         plano.id,
+
                     email:
                         usuario.email
                 });
 
-            if (
-                !assinaturaMP.init_point
-            ) {
-                return res.status(500).json({
+            if (!assinaturaMP?.id) {
+                return res.status(502).json({
                     erro:
-                        "Checkout da assinatura não encontrado"
+                        "Mercado Pago não retornou o ID da assinatura"
                 });
             }
 
-            return res.status(200).json({
-                checkoutUrl:
-                    assinaturaMP.init_point
+            /*
+             * A resposta do POST /preapproval já nos permite
+             * persistir os identificadores imediatamente.
+             * O webhook continua sendo a fonte de sincronização
+             * para alterações posteriores.
+             */
+            if (
+                assinaturaMP.status ===
+                "authorized"
+            ) {
+                const inicioCiclo =
+                    new Date();
+
+                let fimCiclo: Date;
+
+                if (
+                    assinaturaMP.next_payment_date
+                ) {
+                    fimCiclo =
+                        new Date(
+                            assinaturaMP.next_payment_date
+                        );
+                } else {
+                    fimCiclo =
+                        new Date(inicioCiclo);
+
+                    fimCiclo.setMonth(
+                        fimCiclo.getMonth() + 1
+                    );
+                }
+
+                await prisma.assinatura.update({
+                    where: {
+                        empresaId:
+                            usuario.empresaId
+                    },
+                    data: {
+                        planoId:
+                            plano.id,
+
+                        status:
+                            "ATIVA",
+
+                        inicioCiclo,
+                        fimCiclo,
+
+                        proximoPlanoId:
+                            null,
+
+                        mercadoPagoAssinaturaId:
+                            String(
+                                assinaturaMP.id
+                            ),
+
+                        mercadoPagoPayerId:
+                            assinaturaMP.payer_id
+                                ? String(
+                                    assinaturaMP.payer_id
+                                )
+                                : null
+                    }
+                });
+            } else {
+                /*
+                 * Não liberamos acesso se o Mercado Pago não
+                 * devolver authorized.
+                 *
+                 * O webhook poderá sincronizar posteriormente.
+                 */
+                await prisma.assinatura.update({
+                    where: {
+                        empresaId:
+                            usuario.empresaId
+                    },
+                    data: {
+                        mercadoPagoAssinaturaId:
+                            String(
+                                assinaturaMP.id
+                            ),
+
+                        mercadoPagoPayerId:
+                            assinaturaMP.payer_id
+                                ? String(
+                                    assinaturaMP.payer_id
+                                )
+                                : null
+                    }
+                });
+            }
+
+            return res.status(201).json({
+                sucesso: true,
+                assinaturaMercadoPagoId:
+                    String(assinaturaMP.id),
+                status:
+                    assinaturaMP.status
             });
         } catch (erro: any) {
             console.error(
-                "Erro ao iniciar checkout:",
+                "Erro ao criar assinatura:",
                 erro.response?.data ||
                     erro.message ||
                     erro
             );
 
-            return res.status(500).json({
+            const mensagemMercadoPago =
+                erro.response?.data?.message;
+
+            return res.status(
+                erro.response?.status || 500
+            ).json({
                 erro:
-                    "Erro ao iniciar pagamento"
+                    mensagemMercadoPago ||
+                    "Erro ao criar assinatura"
             });
         }
     }
