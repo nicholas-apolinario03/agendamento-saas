@@ -322,7 +322,7 @@ export function DashboardEmpresa() {
 
             setMensagemAssinatura(
                 resposta.data?.mensagem ||
-                    "Renovação cancelada."
+                "Renovação cancelada."
             );
 
             await buscarAssinatura();
@@ -335,7 +335,7 @@ export function DashboardEmpresa() {
 
             setMensagemAssinatura(
                 erro.response?.data?.erro ||
-                    "Não foi possível cancelar a renovação."
+                "Não foi possível cancelar a renovação."
             );
 
         } finally {
@@ -414,32 +414,32 @@ export function DashboardEmpresa() {
 
                                 {assinatura
                                     .fimCiclo && (
-                                    <p>
-                                        Acesso até:{" "}
-                                        <strong>
-                                            {new Date(
-                                                assinatura
-                                                    .fimCiclo
-                                            ).toLocaleDateString(
-                                                "pt-BR"
-                                            )}
-                                        </strong>
-                                    </p>
-                                )}
+                                        <p>
+                                            Acesso até:{" "}
+                                            <strong>
+                                                {new Date(
+                                                    assinatura
+                                                        .fimCiclo
+                                                ).toLocaleDateString(
+                                                    "pt-BR"
+                                                )}
+                                            </strong>
+                                        </p>
+                                    )}
 
                                 {assinatura
                                     .proximoPlano && (
-                                    <p>
-                                        Próximo plano:{" "}
-                                        <strong>
-                                            {
-                                                assinatura
-                                                    .proximoPlano
-                                                    .nome
-                                            }
-                                        </strong>
-                                    </p>
-                                )}
+                                        <p>
+                                            Próximo plano:{" "}
+                                            <strong>
+                                                {
+                                                    assinatura
+                                                        .proximoPlano
+                                                        .nome
+                                                }
+                                            </strong>
+                                        </p>
+                                    )}
 
                                 {assinatura
                                     .cancelamentoAgendado ? (
@@ -449,7 +449,7 @@ export function DashboardEmpresa() {
                                     </p>
                                 ) : (
                                     assinatura.status ===
-                                        "ATIVA" && (
+                                    "ATIVA" && (
                                         <button
                                             type="button"
                                             disabled={
@@ -465,7 +465,9 @@ export function DashboardEmpresa() {
                                                     : "Cancelar renovação"
                                             }
                                         </button>
+
                                     )
+
                                 )}
 
                                 {mensagemAssinatura && (
@@ -481,46 +483,50 @@ export function DashboardEmpresa() {
                                 Não foi possível carregar a assinatura.
                             </p>
                         )}
-                    </div>
-                </section>
-
-                {/* ===================================== */}
-                {/* HORÁRIOS */}
-                {/* ===================================== */}
-
-                <section className="painel-gerenciamento__secao">
-                    <div className="painel-gerenciamento__formulario">
-                        <FormularioHorario
-                            horario={
-                                horarioEditando
-                            }
-                            onSalvar={
-                                salvarHorario
-                            }
-                        />
-                    </div>
-
-                    <div className="painel-gerenciamento__lista">
-                        <ListarHorarios
-                            horarios={
-                                horarios
-                            }
-                            aoEditar={
-                                editarHorario
-                            }
-                            aoExcluir={
-                                excluirHorario
-                            }
-                        />
-                    </div>
-                </section>
+                        < a href="/planos">
+                            Ver planos
+                        </a>
             </div>
+        </section>
 
-            {mensagem && (
-                <p>
-                    {mensagem}
-                </p>
-            )}
-        </DashboardLayout>
+                {/* ===================================== */ }
+    {/* HORÁRIOS */ }
+    {/* ===================================== */ }
+
+    <section className="painel-gerenciamento__secao">
+        <div className="painel-gerenciamento__formulario">
+            <FormularioHorario
+                horario={
+                    horarioEditando
+                }
+                onSalvar={
+                    salvarHorario
+                }
+            />
+        </div>
+
+        <div className="painel-gerenciamento__lista">
+            <ListarHorarios
+                horarios={
+                    horarios
+                }
+                aoEditar={
+                    editarHorario
+                }
+                aoExcluir={
+                    excluirHorario
+                }
+            />
+        </div>
+    </section>
+            </div >
+
+        { mensagem && (
+            <p>
+                {mensagem}
+            </p>
+        )
+}
+        </DashboardLayout >
     );
 }

@@ -17,18 +17,28 @@ import type {
     Servico,
 } from "../types/Servico";
 
+import {
+    verificarAssinatura
+} from "../utils/assinatura";
+
 type FormularioAgendamentoProps = {
-    agendamento: Agendamento | null;
+    agendamento:
+        Agendamento | null;
 
-    clientes: Cliente[];
+    clientes:
+        Cliente[];
 
-    servicos: Servico[];
+    servicos:
+        Servico[];
 
-    datahoraInicial?: string | null;
+    datahoraInicial?:
+        string | null;
 
     onSalvar: (
         dados: NovoAgendamento
-    ) => void | Promise<void>;
+    ) =>
+        void |
+        Promise<void>;
 };
 
 export function FormularioAgendamento({
@@ -38,6 +48,7 @@ export function FormularioAgendamento({
     datahoraInicial,
     onSalvar,
 }: FormularioAgendamentoProps) {
+
     const [
         clienteId,
         setClienteId,
@@ -59,6 +70,71 @@ export function FormularioAgendamento({
     ] = useState<TipoConfirmacao>(
         "AUTOMATICA"
     );
+
+    /*
+     * null = ainda consultando
+     * true = pode modificar
+     * false = somente visualização
+     */
+    const [
+        podeModificar,
+        setPodeModificar
+    ] = useState<
+        boolean | null
+    >(null);
+
+    // ================================================
+    // VERIFICAR ASSINATURA
+    // ================================================
+
+    useEffect(() => {
+
+        let cancelado =
+            false;
+
+        async function consultarAssinatura() {
+
+            const assinaturaValida =
+                await verificarAssinatura();
+
+            if (!cancelado) {
+                setPodeModificar(
+                    assinaturaValida
+                );
+            }
+        }
+
+        consultarAssinatura();
+
+        /*
+         * Se o usuário voltar para esta aba
+         * depois de fazer uma assinatura,
+         * verificamos novamente.
+         */
+        function verificarAoVoltar() {
+            consultarAssinatura();
+        }
+
+        window.addEventListener(
+            "focus",
+            verificarAoVoltar
+        );
+
+        return () => {
+            cancelado =
+                true;
+
+            window.removeEventListener(
+                "focus",
+                verificarAoVoltar
+            );
+        };
+
+    }, []);
+
+    // ================================================
+    // FORMATAR DATA
+    // ================================================
 
     function formatarParaDatetimeLocal(
         dataRecebida: string
@@ -109,8 +185,14 @@ export function FormularioAgendamento({
         );
     }
 
+    // ================================================
+    // PREENCHER FORMULÁRIO
+    // ================================================
+
     useEffect(() => {
+
         if (agendamento) {
+
             setClienteId(
                 agendamento.clienteId
             );
@@ -133,9 +215,13 @@ export function FormularioAgendamento({
             return;
         }
 
-        setClienteId(0);
+        setClienteId(
+            0
+        );
 
-        setServicoId(0);
+        setServicoId(
+            0
+        );
 
         setDatahoraInicio(
             datahoraInicial ?? ""
@@ -144,16 +230,28 @@ export function FormularioAgendamento({
         setConfirmacao(
             "AUTOMATICA"
         );
+
     }, [
         agendamento,
         datahoraInicial,
     ]);
+
+    // ================================================
+    // SALVAR
+    // ================================================
 
     async function handleSubmit(
         event:
             React.FormEvent<HTMLFormElement>
     ) {
         event.preventDefault();
+
+        /*
+         * Segunda proteção no frontend.
+         */
+        if (!podeModificar) {
+            return;
+        }
 
         if (
             clienteId === 0 ||
@@ -171,20 +269,65 @@ export function FormularioAgendamento({
         });
     }
 
+    const bloqueado =
+        podeModificar !== true;
+
     return (
         <form
-            onSubmit={handleSubmit}
-            className="formulario-agendamento"
+            onSubmit={
+                handleSubmit
+            }
+            className=
+                "formulario-agendamento"
         >
+
+            {/* ================================= */}
+            {/* AVISO DA ASSINATURA */}
+            {/* ================================= */}
+
+            {podeModificar === false && (
+                <div className="formulario-agendamento__assinatura-bloqueada">
+
+                    <strong>
+                        Assinatura necessária
+                    </strong>
+
+                    <p>
+                        Seu período gratuito ou
+                        ciclo da assinatura terminou.
+                        Você ainda pode consultar
+                        seus dados, mas precisa
+                        de uma assinatura ativa
+                        para criar ou alterar
+                        agendamentos.
+                    </p>
+
+                    <a href="/planos">
+                        Ver planos
+                    </a>
+
+                </div>
+            )}
+
             <div>
-                <label htmlFor="agendamento-cliente">
+                <label
+                    htmlFor=
+                        "agendamento-cliente"
+                >
                     Cliente
                 </label>
 
                 <select
-                    id="agendamento-cliente"
-                    value={clienteId}
-                    onChange={(event) =>
+                    id=
+                        "agendamento-cliente"
+
+                    value={
+                        clienteId
+                    }
+
+                    onChange={(
+                        event
+                    ) =>
                         setClienteId(
                             Number(
                                 event
@@ -193,22 +336,37 @@ export function FormularioAgendamento({
                             )
                         )
                     }
+
                     disabled={
-                        agendamento !== null
+                        bloqueado ||
+                        agendamento !==
+                            null
                     }
+
                     required
                 >
-                    <option value={0}>
+                    <option
+                        value={0}
+                    >
                         Selecione o cliente
                     </option>
 
                     {clientes.map(
-                        (cliente) => (
+                        (
+                            cliente
+                        ) => (
                             <option
-                                key={cliente.id}
-                                value={cliente.id}
+                                key={
+                                    cliente.id
+                                }
+
+                                value={
+                                    cliente.id
+                                }
                             >
-                                {cliente.nome}
+                                {
+                                    cliente.nome
+                                }
                             </option>
                         )
                     )}
@@ -216,14 +374,24 @@ export function FormularioAgendamento({
             </div>
 
             <div>
-                <label htmlFor="agendamento-servico">
+                <label
+                    htmlFor=
+                        "agendamento-servico"
+                >
                     Serviço
                 </label>
 
                 <select
-                    id="agendamento-servico"
-                    value={servicoId}
-                    onChange={(event) =>
+                    id=
+                        "agendamento-servico"
+
+                    value={
+                        servicoId
+                    }
+
+                    onChange={(
+                        event
+                    ) =>
                         setServicoId(
                             Number(
                                 event
@@ -232,27 +400,45 @@ export function FormularioAgendamento({
                             )
                         )
                     }
+
                     disabled={
-                        agendamento !== null
+                        bloqueado ||
+                        agendamento !==
+                            null
                     }
+
                     required
                 >
-                    <option value={0}>
+                    <option
+                        value={0}
+                    >
                         Selecione o serviço
                     </option>
 
                     {servicos.map(
-                        (servico) => (
+                        (
+                            servico
+                        ) => (
                             <option
-                                key={servico.id}
-                                value={servico.id}
+                                key={
+                                    servico.id
+                                }
+
+                                value={
+                                    servico.id
+                                }
                             >
-                                {servico.nome}
+                                {
+                                    servico.nome
+                                }
+
                                 {" — "}
+
                                 {
                                     servico
                                         .duracaoMinutos
                                 }
+
                                 {" min"}
                             </option>
                         )
@@ -261,46 +447,82 @@ export function FormularioAgendamento({
             </div>
 
             <div>
-                <label htmlFor="agendamento-datahora">
+                <label
+                    htmlFor=
+                        "agendamento-datahora"
+                >
                     Data e horário
                 </label>
 
                 <input
-                    id="agendamento-datahora"
-                    type="datetime-local"
-                    value={datahoraInicio}
-                    onChange={(event) =>
+                    id=
+                        "agendamento-datahora"
+
+                    type=
+                        "datetime-local"
+
+                    value={
+                        datahoraInicio
+                    }
+
+                    onChange={(
+                        event
+                    ) =>
                         setDatahoraInicio(
                             event
                                 .target
                                 .value
                         )
                     }
+
                     readOnly={
-                        agendamento === null &&
+                        agendamento ===
+                            null &&
                         Boolean(
                             datahoraInicial
                         )
                     }
+
+                    disabled={
+                        bloqueado
+                    }
+
                     required
                 />
             </div>
 
             {agendamento === null && (
-                <fieldset className="formulario-agendamento__confirmacao">
+                <fieldset
+                    className=
+                        "formulario-agendamento__confirmacao"
+
+                    disabled={
+                        bloqueado
+                    }
+                >
                     <legend>
                         Confirmação do agendamento
                     </legend>
 
-                    <label className="formulario-agendamento__opcao-confirmacao">
+                    <label
+                        className=
+                            "formulario-agendamento__opcao-confirmacao"
+                    >
                         <input
-                            type="radio"
-                            name="confirmacao"
-                            value="AUTOMATICA"
+                            type=
+                                "radio"
+
+                            name=
+                                "confirmacao"
+
+                            value=
+                                "AUTOMATICA"
+
                             checked={
                                 confirmacao ===
                                 "AUTOMATICA"
                             }
+
                             onChange={() =>
                                 setConfirmacao(
                                     "AUTOMATICA"
@@ -314,21 +536,31 @@ export function FormularioAgendamento({
                             </strong>
 
                             <small>
-                                O agendamento já será criado
-                                como confirmado.
+                                O agendamento já será
+                                criado como confirmado.
                             </small>
                         </span>
                     </label>
 
-                    <label className="formulario-agendamento__opcao-confirmacao">
+                    <label
+                        className=
+                            "formulario-agendamento__opcao-confirmacao"
+                    >
                         <input
-                            type="radio"
-                            name="confirmacao"
-                            value="EMAIL"
+                            type=
+                                "radio"
+
+                            name=
+                                "confirmacao"
+
+                            value=
+                                "EMAIL"
+
                             checked={
                                 confirmacao ===
                                 "EMAIL"
                             }
+
                             onChange={() =>
                                 setConfirmacao(
                                     "EMAIL"
@@ -342,19 +574,30 @@ export function FormularioAgendamento({
                             </strong>
 
                             <small>
-                                O cliente receberá um link para
-                                confirmar o agendamento.
+                                O cliente receberá
+                                um link para confirmar
+                                o agendamento.
                             </small>
                         </span>
                     </label>
                 </fieldset>
             )}
 
-            <button type="submit">
-                {agendamento
-                    ? "Salvar alterações"
-                    : "Agendar"}
+            <button
+                type=
+                    "submit"
+
+                disabled={
+                    bloqueado
+                }
+            >
+                {podeModificar === null
+                    ? "Verificando assinatura..."
+                    : agendamento
+                        ? "Salvar alterações"
+                        : "Agendar"}
             </button>
+
         </form>
     );
 }
