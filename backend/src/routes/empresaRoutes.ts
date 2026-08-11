@@ -4,7 +4,7 @@ import { auth } from "../middleware/auth";
 
 import bcrypt from "bcrypt";
 import { gerartoken } from "../service/jwt";
-import { criarPlanoMercadoPago } from "../service/mercadoPago";
+import { criarAssinaturaMercadoPago, criarPlanoMercadoPago } from "../service/mercadoPago";
 
 const empresaRoutes =
     express.Router();
@@ -224,189 +224,227 @@ empresaRoutes.get("/planos", async (req, res) => {
         });
     }
 });
-empresaRoutes.post("/assinatura/criar", auth, async (req, res) => {
-    try {
-        const usuario = (req as any).usuario;
-        const { planoId } = req.body;
+empresaRoutes.post(
+    "/assinatura/assinar",
+    auth,
+    async (req, res) => {
+        try {
+            const usuario = (req as any).usuario;
 
-        const novoPlano = await prisma.plano.findUnique({
-            where: {
-                id: planoId
-            }
-        });
+            const {
+                planoId,
+                cardTokenId
+            } = req.body;
 
-        if (!novoPlano || !novoPlano.ativo) {
-            return res.status(404).json({
-                erro: "Plano não encontrado"
-            });
-        }
-
-        const assinatura = await prisma.assinatura.findUnique({
-            where: {
-                empresaId: usuario.empresaId
-            },
-            include: {
-                plano: true
-            }
-        });
-
-        if (!assinatura) {
-            return res.status(404).json({
-                erro: "Assinatura não encontrada"
-            });
-        }
-
-        if (assinatura.status === "TRIAL") {
-
-            if (novoPlano.nivel <= assinatura.plano.nivel) {
-
-                await prisma.assinatura.update({
-                    where: {
-                        id: assinatura.id
-                    },
-                    data: {
-                        proximoPlanoId: novoPlano.id
-                    }
-                });
-
-                return res.status(200).json({
-                    acao: "AGENDADO_APOS_TRIAL",
-                    mensagem: "Plano escolhido para iniciar após o período de teste"
+            if (
+                !planoId ||
+                typeof planoId !== "number" ||
+                !cardTokenId
+            ) {
+                return res.status(400).json({
+                    erro: "Dados inválidos"
                 });
             }
 
-            return res.status(200).json({
-                acao: "ESCOLHER_INICIO",
-                planoId: novoPlano.id,
-                mensagem: "Escolha quando deseja iniciar o novo plano"
+            // Nunca confiar no plano/preço enviado pelo frontend.
+            const plano = await prisma.plano.findUnique({
+                where: {
+                    id: planoId
+                }
             });
-        }
 
-        if (assinatura.status === "ATIVA") {
-
-            if (novoPlano.nivel === assinatura.plano.nivel) {
-                return res.status(409).json({
-                    erro: "Este já é o seu plano atual"
+            if (!plano || !plano.ativo) {
+                return res.status(404).json({
+                    erro: "Plano não encontrado"
                 });
             }
 
-            if (novoPlano.nivel < assinatura.plano.nivel) {
-
-                await prisma.assinatura.update({
-                    where: {
-                        id: assinatura.id
-                    },
-                    data: {
-                        proximoPlanoId: novoPlano.id
-                    }
-                });
-
-                return res.status(200).json({
-                    acao: "DOWNGRADE_AGENDADO",
-                    mensagem: "O novo plano será aplicado no próximo ciclo"
+            if (!plano.mercadoPagoPlanoId) {
+                return res.status(400).json({
+                    erro:
+                        "Plano não configurado no Mercado Pago"
                 });
             }
 
-            if (novoPlano.nivel > assinatura.plano.nivel) {
-                return res.status(200).json({
-                    acao: "UPGRADE",
-                    planoId: novoPlano.id,
-                    mensagem: "Upgrade disponível"
+            // Empresa vem do JWT, não do frontend.
+            const empresa = await prisma.empresa.findUnique({
+                where: {
+                    id: usuario.empresaId
+                },
+                include: {
+                    assinatura: true
+                }
+            });
+
+            if (!empresa) {
+                return res.status(404).json({
+                    erro: "Empresa não encontrada"
                 });
             }
-        }
 
-        if (
-            assinatura.status === "VENCIDA" ||
-            assinatura.status === "CANCELADA"
-        ) {
-            return res.status(200).json({
-                acao: "NOVA_ASSINATURA",
-                planoId: novoPlano.id,
-                mensagem: "Pode iniciar uma nova assinatura"
-            });
-        }
-
-        return res.status(400).json({
-            erro: "Não foi possível processar a assinatura"
-        });
-
-    } catch (erro) {
-        console.error(erro);
-
-        return res.status(500).json({
-            erro: "Erro ao processar assinatura"
-        });
-    }
-});
-
-import { buscarPlanoMercadoPago } from "../service/mercadoPago";
-
-empresaRoutes.post("/assinatura/checkout", auth, async (req, res) => {
-    try {
-        const usuario = (req as any).usuario;
-        const { planoId } = req.body;
-
-        if (!planoId || typeof planoId !== "number") {
-            return res.status(400).json({
-                erro: "Plano inválido"
-            });
-        }
-
-        const plano = await prisma.plano.findUnique({
-            where: {
-                id: planoId
+            if (!empresa.assinatura) {
+                return res.status(404).json({
+                    erro: "Assinatura interna não encontrada"
+                });
             }
-        });
 
-        if (!plano || !plano.ativo) {
-            return res.status(404).json({
-                erro: "Plano não encontrado"
+            /*
+             * A referência identifica inequivocamente
+             * a empresa + registro interno da assinatura.
+             *
+             * NÃO usamos payer_id para descobrir a empresa.
+             */
+            const referencia =
+                `NEWERIS_EMPRESA_${empresa.id}_ASSINATURA_${empresa.assinatura.id}`;
+
+            const assinaturaMP =
+                await criarAssinaturaMercadoPago({
+                    planoMercadoPagoId:
+                        plano.mercadoPagoPlanoId,
+
+                    cardTokenId,
+
+                    email: empresa.email,
+
+                    referencia
+                });
+
+            /*
+             * O vínculo é salvo imediatamente.
+             * Não esperamos o webhook para descobrir
+             * quem fez a assinatura.
+             */
+            await prisma.assinatura.update({
+                where: {
+                    empresaId: empresa.id
+                },
+
+                data: {
+                    mercadoPagoAssinaturaId:
+                        assinaturaMP.id,
+
+                    mercadoPagoPayerId:
+                        assinaturaMP.payer_id
+                            ? String(assinaturaMP.payer_id)
+                            : null
+                }
             });
-        }
 
-        if (!plano.mercadoPagoPlanoId) {
-            return res.status(400).json({
-                erro: "Plano não configurado para pagamento"
+            return res.status(201).json({
+                mensagem:
+                    "Assinatura criada com sucesso",
+
+                assinaturaId:
+                    assinaturaMP.id,
+
+                status:
+                    assinaturaMP.status
             });
-        }
 
-        const assinatura = await prisma.assinatura.findUnique({
-            where: {
-                empresaId: usuario.empresaId
-            }
-        });
+        } catch (erro: any) {
 
-        if (!assinatura) {
-            return res.status(404).json({
-                erro: "Assinatura não encontrada"
-            });
-        }
+            console.error(
+                "Erro ao criar assinatura:",
+                erro.response?.data || erro.message
+            );
 
-        const planoMercadoPago =
-            await buscarPlanoMercadoPago(plano.mercadoPagoPlanoId);
-
-        if (!planoMercadoPago.init_point) {
             return res.status(500).json({
-                erro: "Checkout do plano não encontrado"
+                erro:
+                    erro.response?.data?.message ||
+                    "Erro ao criar assinatura"
             });
         }
-
-        return res.status(200).json({
-            checkoutUrl: planoMercadoPago.init_point
-        });
-
-    } catch (erro: any) {
-        console.error(
-            "Erro ao iniciar checkout:",
-            erro.response?.data || erro.message
-        );
-
-        return res.status(500).json({
-            erro: "Erro ao iniciar pagamento"
-        });
     }
-});
+);
+
+import { criarAssinaturaPendenteMercadoPago } from "../service/mercadoPago";
+
+empresaRoutes.post(
+    "/assinatura/checkout",
+    auth,
+    async (req, res) => {
+
+        try {
+
+            const usuario = (req as any).usuario;
+            const { planoId } = req.body;
+
+            if (!planoId || typeof planoId !== "number") {
+                return res.status(400).json({
+                    erro: "Plano inválido"
+                });
+            }
+
+            const plano = await prisma.plano.findUnique({
+                where: {
+                    id: planoId
+                }
+            });
+
+            if (!plano || !plano.ativo) {
+                return res.status(404).json({
+                    erro: "Plano não encontrado"
+                });
+            }
+
+            if (!plano.mercadoPagoPlanoId) {
+                return res.status(400).json({
+                    erro: "Plano não configurado para pagamento"
+                });
+            }
+
+            const assinatura = await prisma.assinatura.findUnique({
+                where: {
+                    empresaId: usuario.empresaId
+                }
+            });
+
+            if (!assinatura) {
+                return res.status(404).json({
+                    erro: "Assinatura não encontrada"
+                });
+            }
+
+            const assinaturaMP =
+                await criarAssinaturaPendenteMercadoPago({
+                    planoMercadoPagoId:
+                        plano.mercadoPagoPlanoId,
+
+                    empresaId:
+                        usuario.empresaId,
+
+                    planoId:
+                        plano.id
+                });
+
+            if (!assinaturaMP.init_point) {
+                return res.status(500).json({
+                    erro: "Checkout não encontrado"
+                });
+            }
+
+            return res.status(200).json({
+
+                checkoutUrl:
+                    assinaturaMP.init_point,
+
+                assinaturaMercadoPagoId:
+                    assinaturaMP.id
+            });
+
+        } catch (erro: any) {
+
+            console.error(
+                "Erro ao iniciar assinatura:",
+                erro.response?.data || erro.message
+            );
+
+            return res.status(500).json({
+                erro: "Erro ao iniciar pagamento"
+            });
+        }
+    }
+);
 import { buscarAssinaturaMercadoPago } from "../service/mercadoPago";
 import {
     WebhookSignatureValidator,

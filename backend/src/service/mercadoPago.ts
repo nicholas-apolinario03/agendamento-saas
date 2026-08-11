@@ -48,36 +48,69 @@ export async function buscarPlanoMercadoPago(
 }
 type CriarAssinaturaMercadoPago = {
     planoMercadoPagoId: string;
-    empresaId: number;
+    cardTokenId: string;
     email: string;
+    referencia: string;
 };
 
 export async function criarAssinaturaMercadoPago({
     planoMercadoPagoId,
-    empresaId,
-    email
+    cardTokenId,
+    email,
+    referencia
 }: CriarAssinaturaMercadoPago) {
 
-    const resposta = await mercadoPagoApi.post("/preapproval", {
-        preapproval_plan_id: planoMercadoPagoId,
+    const resposta = await mercadoPagoApi.post(
+        "/preapproval",
+        {
+            preapproval_plan_id: planoMercadoPagoId,
 
-        payer_email: email,
+            payer_email: email,
 
-        external_reference: `EMPRESA_${empresaId}`,
+            card_token_id: cardTokenId,
 
-        back_url: `${process.env.FRONTEND_URL}/dashboard`,
+            external_reference: referencia,
 
-        status: "pending"
-    });
+            back_url:
+                `${process.env.FRONTEND_URL}/dashboard`,
+
+            status: "authorized"
+        }
+    );
 
     return resposta.data;
 }
+
 export async function buscarAssinaturaMercadoPago(
     assinaturaId: string
 ) {
     const resposta = await mercadoPagoApi.get(
         `/preapproval/${assinaturaId}`
     );
+
+    return resposta.data;
+}
+export async function criarAssinaturaPendenteMercadoPago({
+    planoMercadoPagoId,
+    empresaId,
+    planoId,
+}: {
+    planoMercadoPagoId: string;
+    empresaId: number;
+    planoId: number;
+}) {
+
+    const resposta = await mercadoPagoApi.post("/preapproval", {
+        preapproval_plan_id: planoMercadoPagoId,
+
+        external_reference:
+            `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
+
+        back_url:
+            `${process.env.FRONTEND_URL}/dashboard`,
+
+        status: "pending"
+    });
 
     return resposta.data;
 }

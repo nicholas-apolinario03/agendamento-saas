@@ -181,7 +181,7 @@ model Assinatura {
   proximoPlanoId Int?
 
   status StatusAssinatura @default(TRIAL)
-  mercadoPagoAssinaturaId String? @unique
+
   inicioTrial DateTime?
   fimTrial    DateTime?
 
@@ -189,6 +189,10 @@ model Assinatura {
   fimCiclo    DateTime?
 
   agendamentosNoCiclo Int @default(0)
+
+  // Mercado Pago
+  mercadoPagoAssinaturaId String? @unique
+  mercadoPagoPayerId      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
