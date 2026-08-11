@@ -450,13 +450,9 @@ empresaRoutes.post("/webhook/mercado-pago", async (req, res) => {
             String(data.id)
         );
 
-        console.log("Assinatura válida recebida");
-        console.log("ID:", assinaturaMP.id);
-        console.log("Status:", assinaturaMP.status);
-        console.log("Email:", assinaturaMP.payer_email);
         console.log(
-            "Plano MP:",
-            assinaturaMP.preapproval_plan_id
+            "ASSINATURA MP COMPLETA:",
+            JSON.stringify(assinaturaMP, null, 2)
         );
 
         return res.sendStatus(200);
@@ -470,6 +466,28 @@ empresaRoutes.post("/webhook/mercado-pago", async (req, res) => {
 
         console.error("Erro ao processar webhook:", erro);
         return res.sendStatus(500);
+    }
+});
+
+empresaRoutes.post("/teste-mercado-pago", async (req, res) => {
+    try {
+        const plano = await criarPlanoMercadoPago({
+            nome: "NewerisBook Start",
+            preco: 19.90,
+            referencia: "NEWERIS_START",
+        });
+
+        return res.status(200).json(plano);
+
+    } catch (erro: any) {
+        console.error(
+            "Erro Mercado Pago:",
+            erro.response?.data || erro.message
+        );
+
+        return res.status(500).json({
+            erro: "Erro ao criar plano no Mercado Pago"
+        });
     }
 });
 export default empresaRoutes
