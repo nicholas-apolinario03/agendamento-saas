@@ -12,6 +12,7 @@ import { gerartoken } from "../service/jwt";
 
 import {
     buscarAssinaturaMercadoPago,
+    buscarFaturaMercadoPago,
     criarAssinaturaMercadoPago,
     criarPlanoMercadoPago
 } from "../service/mercadoPago";
@@ -243,7 +244,7 @@ empresaRoutes.get(
                 if (
                     assinatura.fimTrial &&
                     agora <=
-                    assinatura.fimTrial
+                        assinatura.fimTrial
                 ) {
                     return res
                         .status(200)
@@ -268,7 +269,7 @@ empresaRoutes.get(
                 if (
                     !assinatura.fimCiclo ||
                     agora <=
-                    assinatura.fimCiclo
+                        assinatura.fimCiclo
                 ) {
                     return res
                         .status(200)
@@ -523,9 +524,9 @@ empresaRoutes.post(
 
             if (
                 assinatura.status ===
-                "VENCIDA" ||
+                    "VENCIDA" ||
                 assinatura.status ===
-                "CANCELADA"
+                    "CANCELADA"
             ) {
                 return res
                     .status(200)
@@ -800,39 +801,21 @@ empresaRoutes.post(
                     assinaturaMP.status
             });
         } catch (erro: any) {
-
             console.error(
-                "===== ERRO MERCADO PAGO ====="
+                "Erro ao criar assinatura:",
+                erro.response?.data ||
+                    erro.message ||
+                    erro
             );
 
-            console.error(
-                "STATUS:",
-                erro.response?.status
-            );
-
-            console.error(
-                "DATA:",
-                JSON.stringify(
-                    erro.response?.data,
-                    null,
-                    2
-                )
-            );
-
-            console.error(
-                "REQUEST ID:",
-                erro.response?.headers?.["x-request-id"]
-            );
-
-            console.error(
-                "============================="
-            );
+            const mensagemMercadoPago =
+                erro.response?.data?.message;
 
             return res.status(
                 erro.response?.status || 500
             ).json({
                 erro:
-                    erro.response?.data?.message ||
+                    mensagemMercadoPago ||
                     "Erro ao criar assinatura"
             });
         }
@@ -885,308 +868,499 @@ empresaRoutes.post(
                 data
             } = req.body;
 
-            if (
-                type !==
-                "subscription_preapproval"
-            ) {
-                return res.sendStatus(200);
-            }
-
             if (!data?.id) {
                 return res.sendStatus(200);
             }
 
-            /*
-             * Busca os dados completos diretamente no
-             * Mercado Pago.
-             */
-            const assinaturaMP =
-                await buscarAssinaturaMercadoPago(
-                    String(data.id)
-                );
-
-            const referencia =
-                assinaturaMP.external_reference;
+            // ==================================================
+            // 1. EVENTOS DA ASSINATURA
+            // ==================================================
 
             if (
-                !referencia ||
-                typeof referencia !== "string"
+                type ===
+                "subscription_preapproval"
             ) {
-                console.error(
-                    "Assinatura Mercado Pago sem external_reference:",
-                    assinaturaMP.id
-                );
+                const assinaturaMP =
+                    await buscarAssinaturaMercadoPago(
+                        String(data.id)
+                    );
 
-                return res.sendStatus(200);
-            }
-
-            /*
-             * Exemplo esperado:
-             *
-             * NEWERIS_EMPRESA_15_PLANO_2
-             */
-            const match = referencia.match(
-                /^NEWERIS_EMPRESA_(\d+)_PLANO_(\d+)$/
-            );
-
-            if (!match) {
-                console.error(
-                    "external_reference desconhecida:",
-                    referencia
-                );
-
-                return res.sendStatus(200);
-            }
-
-            const empresaId =
-                Number(match[1]);
-
-            const planoId =
-                Number(match[2]);
-
-            if (
-                !Number.isInteger(empresaId) ||
-                !Number.isInteger(planoId)
-            ) {
-                console.error(
-                    "Empresa ou plano inválidos na referência:",
-                    referencia
-                );
-
-                return res.sendStatus(200);
-            }
-
-            const empresa =
-                await prisma.empresa.findUnique({
-                    where: {
-                        id: empresaId
-                    }
-                });
-
-            if (!empresa) {
-                console.error(
-                    `Empresa ${empresaId} não encontrada`
-                );
-
-                return res.sendStatus(200);
-            }
-
-            const plano =
-                await prisma.plano.findUnique({
-                    where: {
-                        id: planoId
-                    }
-                });
-
-            if (!plano) {
-                console.error(
-                    `Plano ${planoId} não encontrado`
-                );
-
-                return res.sendStatus(200);
-            }
-
-            const assinaturaLocal =
-                await prisma.assinatura.findUnique({
-                    where: {
-                        empresaId
-                    }
-                });
-
-            if (!assinaturaLocal) {
-                console.error(
-                    `Assinatura local da empresa ${empresaId} não encontrada`
-                );
-
-                return res.sendStatus(200);
-            }
-
-            console.log(
-                "Webhook Mercado Pago:",
-                {
-                    assinaturaMercadoPagoId:
-                        assinaturaMP.id,
-                    payerId:
-                        assinaturaMP.payer_id,
-                    empresaId,
-                    planoId,
-                    statusMercadoPago:
-                        assinaturaMP.status,
-                    externalReference:
-                        referencia
-                }
-            );
-
-            // --------------------------------------------------
-            // AUTORIZADA
-            // --------------------------------------------------
-
-            if (
-                assinaturaMP.status ===
-                "authorized"
-            ) {
-                const inicioCiclo =
-                    new Date();
-
-                let fimCiclo: Date;
+                const referencia =
+                    assinaturaMP.external_reference;
 
                 if (
-                    assinaturaMP.next_payment_date
+                    !referencia ||
+                    typeof referencia !== "string"
                 ) {
-                    fimCiclo =
-                        new Date(
-                            assinaturaMP.next_payment_date
-                        );
-                } else {
-                    fimCiclo =
-                        new Date(
-                            inicioCiclo
-                        );
-
-                    fimCiclo.setMonth(
-                        fimCiclo.getMonth() + 1
+                    console.error(
+                        "Assinatura Mercado Pago sem external_reference:",
+                        assinaturaMP.id
                     );
+
+                    return res.sendStatus(200);
                 }
 
-                await prisma.assinatura.update({
-                    where: {
-                        empresaId
-                    },
-                    data: {
+                const match =
+                    referencia.match(
+                        /^NEWERIS_EMPRESA_(\d+)_PLANO_(\d+)$/
+                    );
+
+                if (!match) {
+                    console.error(
+                        "external_reference desconhecida:",
+                        referencia
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                const empresaId =
+                    Number(match[1]);
+
+                const planoId =
+                    Number(match[2]);
+
+                if (
+                    !Number.isInteger(empresaId) ||
+                    !Number.isInteger(planoId)
+                ) {
+                    console.error(
+                        "Empresa/plano inválidos:",
+                        referencia
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                const assinaturaLocal =
+                    await prisma.assinatura.findUnique({
+                        where: {
+                            empresaId
+                        }
+                    });
+
+                if (!assinaturaLocal) {
+                    console.error(
+                        `Assinatura local da empresa ${empresaId} não encontrada`
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                console.log(
+                    "Webhook Mercado Pago:",
+                    {
+                        assinaturaMercadoPagoId:
+                            assinaturaMP.id,
+                        payerId:
+                            assinaturaMP.payer_id,
+                        empresaId,
                         planoId,
-                        status: "ATIVA",
-
-                        inicioCiclo,
-                        fimCiclo,
-
-                        proximoPlanoId:
-                            null,
-
-                        /*
-                         * Agora aproveitamos os campos que
-                         * já existem no seu schema.prisma.
-                         */
-                        mercadoPagoAssinaturaId:
-                            String(
-                                assinaturaMP.id
-                            ),
-
-                        mercadoPagoPayerId:
-                            assinaturaMP.payer_id
-                                ? String(
-                                    assinaturaMP.payer_id
-                                )
-                                : null
+                        statusMercadoPago:
+                            assinaturaMP.status,
+                        externalReference:
+                            referencia
                     }
-                });
-
-                console.log(
-                    `Assinatura da empresa ${empresaId} ativada no plano ${planoId}`
                 );
 
-                return res.sendStatus(200);
-            }
+                // ----------------------------------------------
+                // AUTORIZADA
+                // ----------------------------------------------
 
-            // --------------------------------------------------
-            // CANCELADA
-            // --------------------------------------------------
+                if (
+                    assinaturaMP.status ===
+                    "authorized"
+                ) {
+                    /*
+                     * O next_payment_date é usado como fim do
+                     * ciclo atual / próxima cobrança.
+                     */
+                    let fimCiclo: Date;
 
-            if (
-                assinaturaMP.status ===
-                "cancelled"
-            ) {
-                await prisma.assinatura.update({
-                    where: {
-                        empresaId
-                    },
-                    data: {
-                        status:
-                            "CANCELADA",
-                        proximoPlanoId:
-                            null,
+                    if (
+                        assinaturaMP.next_payment_date
+                    ) {
+                        fimCiclo =
+                            new Date(
+                                assinaturaMP.next_payment_date
+                            );
+                    } else {
+                        fimCiclo =
+                            new Date();
 
-                        /*
-                         * Mantemos o ID da assinatura e payer
-                         * para histórico/reconciliação.
-                         */
-                        mercadoPagoAssinaturaId:
-                            assinaturaMP.id
-                                ? String(
+                        fimCiclo.setMonth(
+                            fimCiclo.getMonth() + 1
+                        );
+                    }
+
+                    /*
+                     * Se a assinatura acabou de ser criada, usamos agora
+                     * como início. Se já existe um ciclo, preservamos.
+                     *
+                     * Isso evita que um webhook duplicado fique
+                     * deslocando o inicioCiclo.
+                     */
+                    const inicioCiclo =
+                        assinaturaLocal.inicioCiclo ||
+                        new Date();
+
+                    await prisma.assinatura.update({
+                        where: {
+                            empresaId
+                        },
+                        data: {
+                            planoId,
+
+                            status:
+                                "ATIVA",
+
+                            inicioCiclo,
+                            fimCiclo,
+
+                            proximoPlanoId:
+                                null,
+
+                            mercadoPagoAssinaturaId:
+                                String(
                                     assinaturaMP.id
-                                )
-                                : assinaturaLocal
-                                    .mercadoPagoAssinaturaId,
+                                ),
 
-                        mercadoPagoPayerId:
-                            assinaturaMP.payer_id
-                                ? String(
-                                    assinaturaMP.payer_id
-                                )
-                                : assinaturaLocal
-                                    .mercadoPagoPayerId
-                    }
-                });
+                            mercadoPagoPayerId:
+                                assinaturaMP.payer_id
+                                    ? String(
+                                        assinaturaMP.payer_id
+                                    )
+                                    : assinaturaLocal
+                                        .mercadoPagoPayerId
+                        }
+                    });
+
+                    console.log(
+                        `Assinatura da empresa ${empresaId} ativada no plano ${planoId}`
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                // ----------------------------------------------
+                // CANCELADA
+                // ----------------------------------------------
+
+                if (
+                    assinaturaMP.status ===
+                    "cancelled"
+                ) {
+                    await prisma.assinatura.update({
+                        where: {
+                            empresaId
+                        },
+                        data: {
+                            status:
+                                "CANCELADA",
+                            proximoPlanoId:
+                                null
+                        }
+                    });
+
+                    console.log(
+                        `Assinatura da empresa ${empresaId} cancelada`
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                // ----------------------------------------------
+                // PAUSADA
+                // ----------------------------------------------
+
+                if (
+                    assinaturaMP.status ===
+                    "paused"
+                ) {
+                    /*
+                     * Seu enum atual não possui PAUSADA.
+                     * Usamos VENCIDA para bloquear o acesso.
+                     */
+                    await prisma.assinatura.update({
+                        where: {
+                            empresaId
+                        },
+                        data: {
+                            status:
+                                "VENCIDA"
+                        }
+                    });
+
+                    console.log(
+                        `Assinatura da empresa ${empresaId} pausada`
+                    );
+
+                    return res.sendStatus(200);
+                }
 
                 console.log(
-                    `Assinatura da empresa ${empresaId} cancelada`
+                    `Status de assinatura ${assinaturaMP.status} recebido; nenhuma alteração aplicada`
                 );
 
                 return res.sendStatus(200);
             }
 
-            // --------------------------------------------------
-            // PAUSADA
-            // --------------------------------------------------
+            // ==================================================
+            // 2. COBRANÇA RECORRENTE / FATURA
+            // ==================================================
 
             if (
-                assinaturaMP.status ===
-                "paused"
+                type ===
+                "subscription_authorized_payment"
             ) {
                 /*
-                 * Seu enum não possui PAUSADA.
-                 * Então VENCIDA é usada para bloquear acesso.
+                 * data.id = ID da fatura recorrente.
+                 *
+                 * Consultamos o Mercado Pago em vez de confiar
+                 * somente no corpo do webhook.
                  */
-                await prisma.assinatura.update({
-                    where: {
-                        empresaId
-                    },
-                    data: {
-                        status:
-                            "VENCIDA",
+                const faturaMP =
+                    await buscarFaturaMercadoPago(
+                        String(data.id)
+                    );
 
-                        mercadoPagoAssinaturaId:
-                            assinaturaMP.id
-                                ? String(
-                                    assinaturaMP.id
-                                )
-                                : assinaturaLocal
-                                    .mercadoPagoAssinaturaId,
+                const preapprovalId =
+                    faturaMP.preapproval_id;
 
-                        mercadoPagoPayerId:
-                            assinaturaMP.payer_id
-                                ? String(
-                                    assinaturaMP.payer_id
-                                )
-                                : assinaturaLocal
-                                    .mercadoPagoPayerId
-                    }
-                });
+                if (!preapprovalId) {
+                    console.error(
+                        "Fatura Mercado Pago sem preapproval_id:",
+                        faturaMP.id
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                /*
+                 * Encontramos a empresa pelo ID da assinatura do MP.
+                 * Aqui não precisamos extrair empresaId do
+                 * external_reference.
+                 */
+                const assinaturaLocal =
+                    await prisma.assinatura.findUnique({
+                        where: {
+                            mercadoPagoAssinaturaId:
+                                String(preapprovalId)
+                        }
+                    });
+
+                if (!assinaturaLocal) {
+                    console.error(
+                        "Assinatura local não encontrada para preapproval:",
+                        preapprovalId
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                /*
+                 * A resposta de /authorized_payments/{id} contém
+                 * payment.status. É esse status que interessa para
+                 * saber se aquela cobrança efetivamente foi aprovada.
+                 */
+                const statusPagamento =
+                    faturaMP.payment?.status;
 
                 console.log(
-                    `Assinatura da empresa ${empresaId} pausada`
+                    "Cobrança recorrente Mercado Pago:",
+                    {
+                        authorizedPaymentId:
+                            faturaMP.id,
+
+                        assinaturaMercadoPagoId:
+                            preapprovalId,
+
+                        empresaId:
+                            assinaturaLocal.empresaId,
+
+                        statusFatura:
+                            faturaMP.status,
+
+                        summarized:
+                            faturaMP.summarized,
+
+                        paymentId:
+                            faturaMP.payment?.id,
+
+                        paymentStatus:
+                            statusPagamento,
+
+                        paymentStatusDetail:
+                            faturaMP.payment
+                                ?.status_detail,
+
+                        retryAttempt:
+                            faturaMP.retry_attempt
+                    }
+                );
+
+                // ----------------------------------------------
+                // PAGAMENTO APROVADO
+                // ----------------------------------------------
+
+                if (
+                    statusPagamento ===
+                    "approved"
+                ) {
+                    /*
+                     * Consultamos a assinatura novamente.
+                     * Depois da cobrança aprovada, o MP informa
+                     * a próxima data de pagamento.
+                     */
+                    const assinaturaMP =
+                        await buscarAssinaturaMercadoPago(
+                            String(preapprovalId)
+                        );
+
+                    let novoFimCiclo: Date;
+
+                    if (
+                        assinaturaMP.next_payment_date
+                    ) {
+                        novoFimCiclo =
+                            new Date(
+                                assinaturaMP.next_payment_date
+                            );
+                    } else {
+                        novoFimCiclo =
+                            new Date();
+
+                        novoFimCiclo.setMonth(
+                            novoFimCiclo.getMonth() + 1
+                        );
+                    }
+
+                    /*
+                     * WEBHOOKS PODEM SER REPETIDOS.
+                     *
+                     * Só consideramos que começou um NOVO ciclo se
+                     * o novo next_payment_date for posterior ao
+                     * fimCiclo que já temos no banco.
+                     *
+                     * Isso impede um webhook duplicado de zerar
+                     * agendamentosNoCiclo várias vezes.
+                     */
+                    const cicloAvancou =
+                        !assinaturaLocal.fimCiclo ||
+                        novoFimCiclo.getTime() >
+                            assinaturaLocal
+                                .fimCiclo
+                                .getTime();
+
+                    if (!cicloAvancou) {
+                        console.log(
+                            `Cobrança ${faturaMP.id} já refletida no ciclo da empresa ${assinaturaLocal.empresaId}`
+                        );
+
+                        return res.sendStatus(200);
+                    }
+
+                    const novoInicioCiclo =
+                        assinaturaLocal.fimCiclo ||
+                        new Date();
+
+                    await prisma.assinatura.update({
+                        where: {
+                            empresaId:
+                                assinaturaLocal
+                                    .empresaId
+                        },
+                        data: {
+                            status:
+                                "ATIVA",
+
+                            inicioCiclo:
+                                novoInicioCiclo,
+
+                            fimCiclo:
+                                novoFimCiclo,
+
+                            /*
+                             * Novo mês/ciclo = nova franquia
+                             * de agendamentos.
+                             */
+                            agendamentosNoCiclo:
+                                0
+                        }
+                    });
+
+                    console.log(
+                        `Ciclo da empresa ${assinaturaLocal.empresaId} renovado até ${novoFimCiclo.toISOString()}`
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                // ----------------------------------------------
+                // PAGAMENTO RECUSADO
+                // ----------------------------------------------
+
+                if (
+                    statusPagamento ===
+                    "rejected" ||
+                    statusPagamento ===
+                    "cancelled"
+                ) {
+                    /*
+                     * NÃO marcamos VENCIDA imediatamente.
+                     *
+                     * O Mercado Pago pode realizar novas tentativas
+                     * de cobrança. Além disso, a empresa já pagou
+                     * pelo ciclo atual e deve continuar com acesso
+                     * até fimCiclo.
+                     *
+                     * Como fimCiclo não é estendido aqui, a rota
+                     * /empresa/acesso bloqueará naturalmente quando
+                     * o ciclo já pago terminar.
+                     */
+                    console.warn(
+                        `Cobrança da empresa ${assinaturaLocal.empresaId} não aprovada. Status: ${statusPagamento}. O ciclo não será estendido.`
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                // ----------------------------------------------
+                // PENDENTE / EM PROCESSAMENTO
+                // ----------------------------------------------
+
+                if (
+                    statusPagamento ===
+                        "pending" ||
+                    statusPagamento ===
+                        "in_process"
+                ) {
+                    console.log(
+                        `Cobrança da empresa ${assinaturaLocal.empresaId} ainda está pendente.`
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                /*
+                 * Em algumas fases da fatura pode ainda não existir
+                 * payment.status. Não alteramos o acesso até uma
+                 * atualização posterior do Mercado Pago.
+                 */
+                console.log(
+                    `Cobrança ${faturaMP.id} sem resultado final. Nenhuma alteração aplicada.`
                 );
 
                 return res.sendStatus(200);
             }
 
             /*
-             * pending ou qualquer outro status não ativa
-             * a empresa.
+             * Outros eventos são ignorados por enquanto.
+             *
+             * O Mercado Pago também recomenda habilitar o tópico
+             * "payment" para acompanhar os pagamentos vinculados
+             * às assinaturas. Podemos adicionar isso na próxima etapa.
              */
-            console.log(
-                `Status ${assinaturaMP.status} recebido; nenhuma alteração de acesso realizada`
-            );
-
             return res.sendStatus(200);
         } catch (erro) {
             if (
@@ -1237,8 +1411,8 @@ empresaRoutes.post(
             console.error(
                 "Erro Mercado Pago:",
                 erro.response?.data ||
-                erro.message ||
-                erro
+                    erro.message ||
+                    erro
             );
 
             return res.status(500).json({

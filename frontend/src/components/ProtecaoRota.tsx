@@ -1,44 +1,95 @@
-import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import {
+    Navigate,
+    useLocation
+} from "react-router-dom";
+
+import {
+    useEffect,
+    useState
+} from "react";
 
 import { verificarSessao } from "../utils/auth";
 import { verificarAssinatura } from "../utils/assinatura";
 
 type ProtecaoRotaProps = {
-  children: React.ReactNode;
+    children: React.ReactNode;
 };
 
-export function ProtecaoRota({ children }: ProtecaoRotaProps) {
-  const [assinaturaValida, setAssinaturaValida] =
-    useState<boolean | null>(null);
+export function ProtecaoRota({
+    children
+}: ProtecaoRotaProps) {
 
-  const sessaoValida = verificarSessao();
+    const location = useLocation();
 
-  useEffect(() => {
+    const [assinaturaValida, setAssinaturaValida] =
+        useState<boolean | null>(null);
+
+    const sessaoValida =
+        verificarSessao();
+
+    useEffect(() => {
+
+        if (!sessaoValida) {
+            return;
+        }
+
+        let cancelado = false;
+
+        async function consultarAssinatura() {
+
+            /*
+             * Sempre que entrar/mudar de rota,
+             * voltamos para carregando e consultamos
+             * o backend novamente.
+             */
+            setAssinaturaValida(null);
+
+            const valida =
+                await verificarAssinatura();
+
+            if (!cancelado) {
+                setAssinaturaValida(
+                    valida
+                );
+            }
+        }
+
+        consultarAssinatura();
+
+        return () => {
+            cancelado = true;
+        };
+
+    }, [
+        sessaoValida,
+        location.pathname
+    ]);
+
     if (!sessaoValida) {
-      return;
+        return (
+            <Navigate
+                to="/login"
+                replace
+            />
+        );
     }
 
-    async function consultarAssinatura() {
-      const valida = await verificarAssinatura();
-
-      setAssinaturaValida(valida);
+    if (assinaturaValida === null) {
+        return (
+            <p>
+                Carregando...
+            </p>
+        );
     }
 
-    consultarAssinatura();
-  }, [sessaoValida]);
+    if (!assinaturaValida) {
+        return (
+            <Navigate
+                to="/planos"
+                replace
+            />
+        );
+    }
 
-  if (!sessaoValida) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (assinaturaValida === null) {
-    return <p>Carregando...</p>;
-  }
-
-  if (!assinaturaValida) {
-    return <Navigate to="/assinatura" replace />;
-  }
-
-  return children;
+    return children;
 }

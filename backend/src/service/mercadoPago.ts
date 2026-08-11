@@ -87,7 +87,7 @@ export async function criarAssinaturaMercadoPago({
                 planoMercadoPagoId,
 
             payer_email:
-                process.env.MERCADO_PAGO_TEST_PAYER_EMAIL || email,
+                email,
 
             card_token_id:
                 cardTokenId,
@@ -116,6 +116,29 @@ export async function buscarAssinaturaMercadoPago(
 ) {
     const resposta = await mercadoPagoApi.get(
         `/preapproval/${assinaturaId}`
+    );
+
+    return resposta.data;
+}
+
+
+// ======================================================
+// FATURAS / COBRANÇAS RECORRENTES
+// ======================================================
+
+/**
+ * Busca a fatura ("authorized payment") gerada pela assinatura.
+ *
+ * O webhook subscription_authorized_payment envia o ID dessa
+ * fatura em data.id. Os detalhes ficam disponíveis em:
+ *
+ * GET /authorized_payments/{id}
+ */
+export async function buscarFaturaMercadoPago(
+    authorizedPaymentId: string
+) {
+    const resposta = await mercadoPagoApi.get(
+        `/authorized_payments/${authorizedPaymentId}`
     );
 
     return resposta.data;
