@@ -1,33 +1,45 @@
 import jwt from "jsonwebtoken";
-import { Request, Response, NextFunction } from "express";
+import {
+    Request,
+    Response,
+    NextFunction
+} from "express";
 
-export function auth( req: Request,res: Response, next: NextFunction){
-
+export function auth(
+    req: Request,
+    res: Response,
+    next: NextFunction
+) {
     const authHeader = req.headers.authorization;
-    if (!authHeader){
+
+    if (!authHeader) {
         return res.status(401).json({
-            erro:"token nao informado"
+            erro: "Token não informado"
         });
     }
 
-const token = authHeader.split(" ")[1];
-try{
+    const [tipo, token] = authHeader.split(" ");
 
-     const payload = jwt.verify(
-    token,
-    process.env.JWT_SECRET!
-  );
+    if (tipo !== "Bearer" || !token) {
+        return res.status(401).json({
+            erro: "Formato do token inválido"
+        });
+    }
 
-  (req as any).usuario = payload;
+    try {
+        const payload = jwt.verify(
+            token,
+            process.env.JWT_SECRET!
+        );
 
-  next();
+        (req as any).usuario = payload;
 
+        next();
+    } catch (error) {
+        console.error("Erro JWT:", error);
 
-}catch(error){
-    console.error("Erro JWT:", error);
-
-    return res.status(401).json({
-        erro:"token invalido"
-    })
-}
+        return res.status(401).json({
+            erro: "Token inválido"
+        });
+    }
 }
