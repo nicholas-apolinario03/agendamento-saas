@@ -10,6 +10,7 @@ import { CadastroClienteEmpresa } from "./components/CadastroClienteEmpresa";
 import { DashboardAgendamento } from "./pages/DashboardAgendamento";
 import { PoliticaPrivacidade } from "./components/PoliticaPrivacidade";
 import Index from "./pages/PaginaInicial";
+import Planos from "./pages/Planos";
 
 
 
@@ -17,12 +18,12 @@ function App() {
   return (
     <Routes>
       <Route
-    path="/politica-de-privacidade"
-    element={<PoliticaPrivacidade />}
-/>
-<Route path="/" element={
-  <Index/>
-}/>
+        path="/politica-de-privacidade"
+        element={<PoliticaPrivacidade />}
+      />
+      <Route path="/" element={
+        <Index />
+      } />
       <Route path="/dashboard"
         element={
           <ProtecaoRota>
@@ -50,7 +51,7 @@ function App() {
           </ProtecaoRota>
         }
       />
-       <Route path="/cliente"
+      <Route path="/cliente"
         element={
           <ProtecaoRota>
 
@@ -78,8 +79,12 @@ function App() {
           </PublicRoute>
         }
       />
-       
-      
+
+      <Route
+        path="/planos"
+        element={<Planos />}
+      />
+
 
     </Routes>
 

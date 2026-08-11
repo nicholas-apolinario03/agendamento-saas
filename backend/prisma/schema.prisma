@@ -98,19 +98,7 @@ model Agendamento {
   servico Servico @relation(fields: [servicoId], references: [id])
   cliente Cliente? @relation(fields: [clienteId], references: [id])
 }
-model Assinatura {
-  id Int @id @default(autoincrement())
 
-  empresaId Int @unique
-
-  plano String
-
-  ativa Boolean @default(true)
-
-  vencimento DateTime
-
-  empresa Empresa @relation(fields: [empresaId], references: [id])
-}
 model SessaoWhatsApp {
     id               Int      @id @default(autoincrement())
     empresaId        Int
@@ -163,4 +151,51 @@ model IntegracaoWhatsApp {
     updatedAt                 DateTime @updatedAt
 
     empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+}
+
+enum StatusAssinatura {
+  TRIAL
+  ATIVA
+  VENCIDA
+  CANCELADA
+}
+
+model Plano {
+  id                 Int     @id @default(autoincrement())
+  nome               String  @unique
+  preco              Decimal @db.Decimal(10, 2)
+  limiteAgendamentos Int
+  nivel Int @unique
+  mercadoPagoPlanoId String? @unique
+
+  ativo Boolean @default(true)
+
+  assinaturasAtuais  Assinatura[] @relation("PlanoAtual")
+  proximasAssinaturas Assinatura[] @relation("ProximoPlano")
+}
+
+model Assinatura {
+  id             Int  @id @default(autoincrement())
+  empresaId      Int  @unique
+  planoId        Int
+  proximoPlanoId Int?
+
+  status StatusAssinatura @default(TRIAL)
+  mercadoPagoAssinaturaId String? @unique
+  inicioTrial DateTime?
+  fimTrial    DateTime?
+
+  inicioCiclo DateTime?
+  fimCiclo    DateTime?
+
+  agendamentosNoCiclo Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  plano Plano @relation("PlanoAtual",fields: [planoId],references: [id])
+
+  proximoPlano Plano? @relation("ProximoPlano",fields: [proximoPlanoId],references: [id] )
 }

@@ -1,18 +1,44 @@
 import { Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+
 import { verificarSessao } from "../utils/auth";
+import { verificarAssinatura } from "../utils/assinatura";
 
-type ProtecaoRotaProps={
-
-    children: React.ReactNode;
+type ProtecaoRotaProps = {
+  children: React.ReactNode;
 };
 
-export function ProtecaoRota( {children}: ProtecaoRotaProps ){
-    
- 
+export function ProtecaoRota({ children }: ProtecaoRotaProps) {
+  const [assinaturaValida, setAssinaturaValida] =
+    useState<boolean | null>(null);
 
-    if(!verificarSessao()){
-        return <Navigate to="/login" replace/>;
+  const sessaoValida = verificarSessao();
 
+  useEffect(() => {
+    if (!sessaoValida) {
+      return;
     }
-    return children;
+
+    async function consultarAssinatura() {
+      const valida = await verificarAssinatura();
+
+      setAssinaturaValida(valida);
+    }
+
+    consultarAssinatura();
+  }, [sessaoValida]);
+
+  if (!sessaoValida) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (assinaturaValida === null) {
+    return <p>Carregando...</p>;
+  }
+
+  if (!assinaturaValida) {
+    return <Navigate to="/assinatura" replace />;
+  }
+
+  return children;
 }
