@@ -356,6 +356,144 @@ empresaRoutes.post(
         }
     }
 );
+empresaRoutes.post("/assinatura/criar", auth, async (req, res) => {
+    try {
+        const usuario = (req as any).usuario;
+        const { planoId } = req.body;
+
+        if (!planoId || typeof planoId !== "number") {
+            return res.status(400).json({
+                erro: "Plano inválido"
+            });
+        }
+
+        const planoNovo = await prisma.plano.findUnique({
+            where: {
+                id: planoId
+            }
+        });
+
+        if (!planoNovo || !planoNovo.ativo) {
+            return res.status(404).json({
+                erro: "Plano não encontrado"
+            });
+        }
+
+        const assinatura = await prisma.assinatura.findUnique({
+            where: {
+                empresaId: usuario.empresaId
+            },
+            include: {
+                plano: true
+            }
+        });
+
+        if (!assinatura) {
+            return res.status(404).json({
+                erro: "Assinatura não encontrada"
+            });
+        }
+
+        // =========================
+        // TRIAL
+        // =========================
+
+        if (assinatura.status === "TRIAL") {
+
+            // Mesmo plano do trial
+            if (planoNovo.id === assinatura.planoId) {
+                return res.status(200).json({
+                    acao: "AGENDADO_APOS_TRIAL"
+                });
+            }
+
+            // Plano inferior ao trial atual
+            if (planoNovo.nivel < assinatura.plano.nivel) {
+
+                await prisma.assinatura.update({
+                    where: {
+                        empresaId: usuario.empresaId
+                    },
+                    data: {
+                        proximoPlanoId: planoNovo.id
+                    }
+                });
+
+                return res.status(200).json({
+                    acao: "AGENDADO_APOS_TRIAL"
+                });
+            }
+
+            // Plano superior ao trial
+            if (planoNovo.nivel > assinatura.plano.nivel) {
+                return res.status(200).json({
+                    acao: "ESCOLHER_INICIO"
+                });
+            }
+        }
+
+        // =========================
+        // ASSINATURA ATIVA
+        // =========================
+
+        if (assinatura.status === "ATIVA") {
+
+            if (planoNovo.id === assinatura.planoId) {
+                return res.status(400).json({
+                    erro: "Você já possui esse plano"
+                });
+            }
+
+            // Downgrade
+            if (planoNovo.nivel < assinatura.plano.nivel) {
+
+                await prisma.assinatura.update({
+                    where: {
+                        empresaId: usuario.empresaId
+                    },
+                    data: {
+                        proximoPlanoId: planoNovo.id
+                    }
+                });
+
+                return res.status(200).json({
+                    acao: "DOWNGRADE_AGENDADO"
+                });
+            }
+
+            // Upgrade
+            if (planoNovo.nivel > assinatura.plano.nivel) {
+                return res.status(200).json({
+                    acao: "UPGRADE"
+                });
+            }
+        }
+
+        // =========================
+        // VENCIDA / CANCELADA
+        // =========================
+
+        if (
+            assinatura.status === "VENCIDA" ||
+            assinatura.status === "CANCELADA"
+        ) {
+            return res.status(200).json({
+                acao: "NOVA_ASSINATURA"
+            });
+        }
+
+        return res.status(400).json({
+            erro: "Não foi possível processar a assinatura"
+        });
+
+    } catch (erro) {
+        console.error("Erro ao selecionar plano:", erro);
+
+        return res.status(500).json({
+            erro: "Erro interno"
+        });
+    }
+});
 
 import { criarAssinaturaPendenteMercadoPago } from "../service/mercadoPago";
 
