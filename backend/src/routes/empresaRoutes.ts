@@ -11,13 +11,48 @@ import { auth } from "../middleware/auth";
 import { gerartoken } from "../service/jwt";
 
 import {
+    alterarValorAssinaturaMercadoPago,
+    atualizarReferenciaAssinaturaMercadoPago,
     buscarAssinaturaMercadoPago,
     buscarFaturaMercadoPago,
+    buscarPlanoMercadoPago,
+    cancelarAssinaturaMercadoPago,
     criarAssinaturaMercadoPago,
-    criarPlanoMercadoPago
+    criarPlanoMercadoPago,
+    fazerUpgradeAssinaturaMercadoPago
 } from "../service/mercadoPago";
 
 const empresaRoutes = express.Router();
+
+
+function calcularFimCiclo(
+    inicio: Date,
+    frequency: number,
+    frequencyType: string
+): Date {
+    const fim = new Date(inicio);
+
+    if (frequencyType === "days") {
+        fim.setDate(
+            fim.getDate() + frequency
+        );
+
+        return fim;
+    }
+
+    if (frequencyType === "months") {
+        fim.setMonth(
+            fim.getMonth() + frequency
+        );
+
+        return fim;
+    }
+
+    throw new Error(
+        `Frequência não suportada: ${frequencyType}`
+    );
+}
+
 
 // ======================================================
 // EMPRESA
@@ -239,21 +274,20 @@ empresaRoutes.get(
             const agora = new Date();
 
             if (
-                assinatura.status === "TRIAL"
+                assinatura.status ===
+                "TRIAL"
             ) {
                 if (
                     assinatura.fimTrial &&
                     agora <=
                         assinatura.fimTrial
                 ) {
-                    return res
-                        .status(200)
-                        .json({
-                            acesso: true,
-                            status: "TRIAL",
-                            fimTrial:
-                                assinatura.fimTrial
-                        });
+                    return res.status(200).json({
+                        acesso: true,
+                        status: "TRIAL",
+                        fimTrial:
+                            assinatura.fimTrial
+                    });
                 }
 
                 return res.status(403).json({
@@ -264,21 +298,20 @@ empresaRoutes.get(
             }
 
             if (
-                assinatura.status === "ATIVA"
+                assinatura.status ===
+                "ATIVA"
             ) {
                 if (
-                    !assinatura.fimCiclo ||
+                    assinatura.fimCiclo &&
                     agora <=
                         assinatura.fimCiclo
                 ) {
-                    return res
-                        .status(200)
-                        .json({
-                            acesso: true,
-                            status: "ATIVA",
-                            fimCiclo:
-                                assinatura.fimCiclo
-                        });
+                    return res.status(200).json({
+                        acesso: true,
+                        status: "ATIVA",
+                        fimCiclo:
+                            assinatura.fimCiclo
+                    });
                 }
 
                 return res.status(403).json({
@@ -293,6 +326,7 @@ empresaRoutes.get(
                 motivo:
                     "ASSINATURA_INATIVA"
             });
+
         } catch (erro) {
             console.error(
                 "Erro ao verificar acesso:",
@@ -400,9 +434,9 @@ empresaRoutes.post(
                 });
             }
 
-            // --------------------------------------------------
+            // ==================================================
             // TRIAL
-            // --------------------------------------------------
+            // ==================================================
 
             if (
                 assinatura.status === "TRIAL"
@@ -422,12 +456,10 @@ empresaRoutes.post(
                         }
                     });
 
-                    return res
-                        .status(200)
-                        .json({
-                            acao:
-                                "AGENDADO_APOS_TRIAL"
-                        });
+                    return res.status(200).json({
+                        acao:
+                            "AGENDADO_APOS_TRIAL"
+                    });
                 }
 
                 if (
@@ -445,30 +477,26 @@ empresaRoutes.post(
                         }
                     });
 
-                    return res
-                        .status(200)
-                        .json({
-                            acao:
-                                "AGENDADO_APOS_TRIAL"
-                        });
+                    return res.status(200).json({
+                        acao:
+                            "AGENDADO_APOS_TRIAL"
+                    });
                 }
 
                 if (
                     planoNovo.nivel >
                     assinatura.plano.nivel
                 ) {
-                    return res
-                        .status(200)
-                        .json({
-                            acao:
-                                "ESCOLHER_INICIO"
-                        });
+                    return res.status(200).json({
+                        acao:
+                            "ESCOLHER_INICIO"
+                    });
                 }
             }
 
-            // --------------------------------------------------
+            // ==================================================
             // ASSINATURA ATIVA
-            // --------------------------------------------------
+            // ==================================================
 
             if (
                 assinatura.status === "ATIVA"
@@ -484,9 +512,40 @@ empresaRoutes.post(
                 }
 
                 if (
+                    !assinatura
+                        .mercadoPagoAssinaturaId
+                ) {
+                    return res.status(400).json({
+                        erro:
+                            "Assinatura Mercado Pago não encontrada"
+                    });
+                }
+
+                // ----------------------------------------------
+                // DOWNGRADE
+                // ----------------------------------------------
+                //
+                // O cliente continua com os recursos do plano
+                // atual até o fim do ciclo.
+                //
+                // Porém o valor da PRÓXIMA cobrança já é alterado
+                // agora no Mercado Pago.
+                //
+                // Quando a cobrança for aprovada, o webhook troca
+                // planoId pelo proximoPlanoId.
+                //
+                if (
                     planoNovo.nivel <
                     assinatura.plano.nivel
                 ) {
+                    await alterarValorAssinaturaMercadoPago(
+                        assinatura
+                            .mercadoPagoAssinaturaId,
+                        Number(
+                            planoNovo.preco
+                        )
+                    );
+
                     await prisma.assinatura.update({
                         where: {
                             empresaId:
@@ -498,29 +557,80 @@ empresaRoutes.post(
                         }
                     });
 
-                    return res
-                        .status(200)
-                        .json({
-                            acao:
-                                "DOWNGRADE_AGENDADO"
-                        });
+                    return res.status(200).json({
+                        acao:
+                            "DOWNGRADE_AGENDADO",
+
+                        planoAtual:
+                            assinatura.plano.nome,
+
+                        proximoPlano:
+                            planoNovo.nome,
+
+                        fimCiclo:
+                            assinatura.fimCiclo
+                    });
                 }
 
+                // ----------------------------------------------
+                // UPGRADE
+                // ----------------------------------------------
+                //
+                // O acesso ao novo plano é liberado imediatamente.
+                // A mesma assinatura do Mercado Pago é mantida;
+                // apenas o valor das próximas cobranças é alterado.
+                //
                 if (
                     planoNovo.nivel >
                     assinatura.plano.nivel
                 ) {
-                    return res
-                        .status(200)
-                        .json({
-                            acao: "UPGRADE"
-                        });
+                    await fazerUpgradeAssinaturaMercadoPago({
+                        assinaturaId:
+                            assinatura
+                                .mercadoPagoAssinaturaId,
+
+                        novoValor:
+                            Number(
+                                planoNovo.preco
+                            ),
+
+                        empresaId:
+                            usuario.empresaId,
+
+                        planoId:
+                            planoNovo.id
+                    });
+
+                    await prisma.assinatura.update({
+                        where: {
+                            empresaId:
+                                usuario.empresaId
+                        },
+                        data: {
+                            planoId:
+                                planoNovo.id,
+
+                            proximoPlanoId:
+                                null
+                        }
+                    });
+
+                    return res.status(200).json({
+                        acao:
+                            "UPGRADE_REALIZADO",
+
+                        planoId:
+                            planoNovo.id,
+
+                        plano:
+                            planoNovo.nome
+                    });
                 }
             }
 
-            // --------------------------------------------------
+            // ==================================================
             // VENCIDA / CANCELADA
-            // --------------------------------------------------
+            // ==================================================
 
             if (
                 assinatura.status ===
@@ -528,26 +638,31 @@ empresaRoutes.post(
                 assinatura.status ===
                     "CANCELADA"
             ) {
-                return res
-                    .status(200)
-                    .json({
-                        acao:
-                            "NOVA_ASSINATURA"
-                    });
+                return res.status(200).json({
+                    acao:
+                        "NOVA_ASSINATURA"
+                });
             }
 
             return res.status(400).json({
                 erro:
                     "Não foi possível processar a assinatura"
             });
-        } catch (erro) {
+
+        } catch (erro: any) {
             console.error(
                 "Erro ao selecionar plano:",
-                erro
+                erro.response?.data ||
+                    erro.message ||
+                    erro
             );
 
-            return res.status(500).json({
-                erro: "Erro interno"
+            return res.status(
+                erro.response?.status || 500
+            ).json({
+                erro:
+                    erro.response?.data?.message ||
+                    "Erro ao processar alteração de plano"
             });
         }
     }
@@ -713,26 +828,39 @@ empresaRoutes.post(
                 assinaturaMP.status ===
                 "authorized"
             ) {
+                const planoMP =
+                    await buscarPlanoMercadoPago(
+                        plano.mercadoPagoPlanoId
+                    );
+
+                const frequency =
+                    Number(
+                        planoMP.auto_recurring
+                            ?.frequency
+                    );
+
+                const frequencyType =
+                    planoMP.auto_recurring
+                        ?.frequency_type;
+
+                if (
+                    !frequency ||
+                    !frequencyType
+                ) {
+                    throw new Error(
+                        "Frequência do plano Mercado Pago não encontrada"
+                    );
+                }
+
                 const inicioCiclo =
                     new Date();
 
-                let fimCiclo: Date;
-
-                if (
-                    assinaturaMP.next_payment_date
-                ) {
-                    fimCiclo =
-                        new Date(
-                            assinaturaMP.next_payment_date
-                        );
-                } else {
-                    fimCiclo =
-                        new Date(inicioCiclo);
-
-                    fimCiclo.setMonth(
-                        fimCiclo.getMonth() + 1
+                const fimCiclo =
+                    calcularFimCiclo(
+                        inicioCiclo,
+                        frequency,
+                        frequencyType
                     );
-                }
 
                 await prisma.assinatura.update({
                     where: {
@@ -817,6 +945,101 @@ empresaRoutes.post(
                 erro:
                     mensagemMercadoPago ||
                     "Erro ao criar assinatura"
+            });
+        }
+    }
+);
+
+
+// ======================================================
+// CANCELAR ASSINATURA
+// ======================================================
+
+empresaRoutes.post(
+    "/assinatura/cancelar",
+    auth,
+    async (req, res) => {
+        try {
+            const usuario =
+                (req as any).usuario;
+
+            const assinatura =
+                await prisma.assinatura.findUnique({
+                    where: {
+                        empresaId:
+                            usuario.empresaId
+                    }
+                });
+
+            if (!assinatura) {
+                return res.status(404).json({
+                    erro:
+                        "Assinatura não encontrada"
+                });
+            }
+
+            if (
+                assinatura.status !==
+                "ATIVA"
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Não existe uma assinatura ativa para cancelar"
+                });
+            }
+
+            if (
+                !assinatura
+                    .mercadoPagoAssinaturaId
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "Assinatura Mercado Pago não encontrada"
+                });
+            }
+
+            const assinaturaMP =
+                await cancelarAssinaturaMercadoPago(
+                    assinatura
+                        .mercadoPagoAssinaturaId
+                );
+
+            await prisma.assinatura.update({
+                where: {
+                    empresaId:
+                        usuario.empresaId
+                },
+                data: {
+                    status:
+                        "CANCELADA",
+
+                    proximoPlanoId:
+                        null
+                }
+            });
+
+            return res.status(200).json({
+                sucesso: true,
+                mensagem:
+                    "Assinatura cancelada com sucesso",
+                statusMercadoPago:
+                    assinaturaMP.status
+            });
+
+        } catch (erro: any) {
+            console.error(
+                "Erro ao cancelar assinatura:",
+                erro.response?.data ||
+                    erro.message ||
+                    erro
+            );
+
+            return res.status(
+                erro.response?.status || 500
+            ).json({
+                erro:
+                    erro.response?.data?.message ||
+                    "Erro ao cancelar assinatura"
             });
         }
     }
@@ -1018,7 +1241,7 @@ empresaRoutes.post(
                             fimCiclo,
 
                             proximoPlanoId:
-                                null,
+                                assinaturaLocal.proximoPlanoId,
 
                             mercadoPagoAssinaturaId:
                                 String(
@@ -1047,8 +1270,8 @@ empresaRoutes.post(
                 // ----------------------------------------------
 
                 if (
-                    assinaturaMP.status ===
-                    "cancelled"
+                    assinaturaMP.status === "canceled" ||
+                    assinaturaMP.status === "cancelled"
                 ) {
                     await prisma.assinatura.update({
                         where: {
@@ -1264,6 +1487,59 @@ empresaRoutes.post(
                         assinaturaLocal.fimCiclo ||
                         new Date();
 
+                    /*
+                     * Se havia downgrade agendado, essa cobrança
+                     * já foi feita com o novo valor porque alteramos
+                     * o transaction_amount quando o usuário pediu
+                     * o downgrade.
+                     *
+                     * Agora que o novo ciclo começou, aplicamos
+                     * também o plano local.
+                     */
+                    let planoIdNovo =
+                        assinaturaLocal.planoId;
+
+                    let proximoPlanoIdNovo:
+                        number | null =
+                        assinaturaLocal
+                            .proximoPlanoId;
+
+                    if (
+                        assinaturaLocal
+                            .proximoPlanoId
+                    ) {
+                        const proximoPlano =
+                            await prisma.plano.findUnique({
+                                where: {
+                                    id:
+                                        assinaturaLocal
+                                            .proximoPlanoId
+                                }
+                            });
+
+                        if (proximoPlano) {
+                            /*
+                             * Atualizamos também a external_reference
+                             * para os próximos eventos da assinatura
+                             * apontarem para o plano correto.
+                             */
+                            await atualizarReferenciaAssinaturaMercadoPago(
+                                String(
+                                    preapprovalId
+                                ),
+                                assinaturaLocal
+                                    .empresaId,
+                                proximoPlano.id
+                            );
+
+                            planoIdNovo =
+                                proximoPlano.id;
+
+                            proximoPlanoIdNovo =
+                                null;
+                        }
+                    }
+
                     await prisma.assinatura.update({
                         where: {
                             empresaId:
@@ -1271,6 +1547,12 @@ empresaRoutes.post(
                                     .empresaId
                         },
                         data: {
+                            planoId:
+                                planoIdNovo,
+
+                            proximoPlanoId:
+                                proximoPlanoIdNovo,
+
                             status:
                                 "ATIVA",
 
@@ -1280,10 +1562,6 @@ empresaRoutes.post(
                             fimCiclo:
                                 novoFimCiclo,
 
-                            /*
-                             * Novo mês/ciclo = nova franquia
-                             * de agendamentos.
-                             */
                             agendamentosNoCiclo:
                                 0
                         }

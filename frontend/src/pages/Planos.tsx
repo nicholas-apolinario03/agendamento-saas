@@ -28,6 +28,7 @@ type AcaoAssinatura =
     | "ESCOLHER_INICIO"
     | "DOWNGRADE_AGENDADO"
     | "UPGRADE"
+    | "UPGRADE_REALIZADO"
     | "NOVA_ASSINATURA";
 
 type RespostaAssinatura = {
@@ -55,10 +56,6 @@ export default function Planos() {
 
     const cardFormRef =
         useRef<any>(null);
-
-    // ==================================================
-    // BUSCAR PLANOS
-    // ==================================================
 
     useEffect(() => {
         async function buscarPlanos() {
@@ -89,10 +86,6 @@ export default function Planos() {
             return;
         }
 
-        /*
-         * Fazemos uma cópia depois da validação
-         * para o TypeScript entender que não é null.
-         */
         const planoSelecionado = planoPagamento;
 
         let cancelado = false;
@@ -275,6 +268,10 @@ export default function Planos() {
                                                 planoId:
                                                     planoSelecionado.id,
 
+                                                /*
+                                                 * ÚNICO dado relacionado ao
+                                                 * cartão enviado ao backend.
+                                                 */
                                                 cardTokenId
                                             },
                                             {
@@ -319,6 +316,14 @@ export default function Planos() {
                                         erro.message ||
                                         "Não foi possível criar a assinatura."
                                     );
+
+                                    /*
+                                     * CardToken é de uso único.
+                                     * Em caso de falha na criação da
+                                     * assinatura, o usuário deve enviar
+                                     * novamente o formulário para que
+                                     * o SDK gere um novo token.
+                                     */
                                 } finally {
                                     if (submit) {
                                         submit.disabled =
@@ -366,7 +371,6 @@ export default function Planos() {
 
         return () => {
             cancelado = true;
-
             cardFormRef.current = null;
         };
     }, [
@@ -435,7 +439,6 @@ export default function Planos() {
                             plano
                         );
                     }
-
                     break;
                 }
 
@@ -446,8 +449,23 @@ export default function Planos() {
                     break;
 
                 case "UPGRADE":
+                    /*
+                     * Compatibilidade com resposta antiga.
+                     * O backend atualizado já executa o upgrade
+                     * e retorna UPGRADE_REALIZADO.
+                     */
                     alert(
-                        "O upgrade de uma assinatura ativa será feito alterando a assinatura existente. Essa etapa será implementada separadamente para evitar cobrança duplicada."
+                        "Não foi possível concluir o upgrade automaticamente. Atualize a página e tente novamente."
+                    );
+                    break;
+
+                case "UPGRADE_REALIZADO":
+                    alert(
+                        "Upgrade realizado com sucesso! O novo plano já está disponível."
+                    );
+
+                    navigate(
+                        "/dashboard"
                     );
                     break;
 
@@ -480,10 +498,6 @@ export default function Planos() {
         }
     }
 
-    // ==================================================
-    // LOADING
-    // ==================================================
-
     if (carregando) {
         return (
             <p>
@@ -491,10 +505,6 @@ export default function Planos() {
             </p>
         );
     }
-
-    // ==================================================
-    // TELA
-    // ==================================================
 
     return (
         <main>
@@ -573,7 +583,9 @@ export default function Planos() {
                     </p>
 
                     <p>
-                        Os dados sensíveis do cartão são processados pelo Mercado Pago.
+                        Os dados sensíveis do
+                        cartão são processados
+                        pelo Mercado Pago.
                     </p>
 
                     <form
@@ -582,7 +594,6 @@ export default function Planos() {
                         <label>
                             Número do cartão
                         </label>
-
                         <div
                             id="form-checkout__cardNumber"
                             className="container"
@@ -595,7 +606,6 @@ export default function Planos() {
                         <label>
                             Validade
                         </label>
-
                         <div
                             id="form-checkout__expirationDate"
                             className="container"
@@ -608,7 +618,6 @@ export default function Planos() {
                         <label>
                             CVV
                         </label>
-
                         <div
                             id="form-checkout__securityCode"
                             className="container"
@@ -621,7 +630,6 @@ export default function Planos() {
                         <label>
                             Nome no cartão
                         </label>
-
                         <input
                             type="text"
                             id="form-checkout__cardholderName"
@@ -630,7 +638,6 @@ export default function Planos() {
                         <label>
                             Banco emissor
                         </label>
-
                         <select
                             id="form-checkout__issuer"
                         />
@@ -638,7 +645,6 @@ export default function Planos() {
                         <label>
                             Parcelas
                         </label>
-
                         <select
                             id="form-checkout__installments"
                         />
@@ -646,7 +652,6 @@ export default function Planos() {
                         <label>
                             Documento
                         </label>
-
                         <select
                             id="form-checkout__identificationType"
                         />
@@ -660,7 +665,6 @@ export default function Planos() {
                         <label>
                             E-mail
                         </label>
-
                         <input
                             type="email"
                             id="form-checkout__cardholderEmail"
@@ -679,7 +683,6 @@ export default function Planos() {
                                 setPlanoPagamento(
                                     null
                                 );
-
                                 setMensagemPagamento(
                                     ""
                                 );

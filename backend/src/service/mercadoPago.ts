@@ -143,3 +143,100 @@ export async function buscarFaturaMercadoPago(
 
     return resposta.data;
 }
+
+
+// ======================================================
+// GERENCIAMENTO DA ASSINATURA
+// ======================================================
+
+/**
+ * Altera o valor que será usado nas próximas cobranças
+ * da assinatura existente.
+ *
+ * Não cria uma segunda assinatura.
+ */
+export async function alterarValorAssinaturaMercadoPago(
+    assinaturaId: string,
+    novoValor: number
+) {
+    const resposta = await mercadoPagoApi.put(
+        `/preapproval/${assinaturaId}`,
+        {
+            auto_recurring: {
+                transaction_amount: novoValor,
+                currency_id: "BRL"
+            }
+        }
+    );
+
+    return resposta.data;
+}
+
+/**
+ * Atualiza a referência usada para sincronizar a assinatura
+ * do Mercado Pago com empresa/plano do Neweris.
+ */
+export async function atualizarReferenciaAssinaturaMercadoPago(
+    assinaturaId: string,
+    empresaId: number,
+    planoId: number
+) {
+    const resposta = await mercadoPagoApi.put(
+        `/preapproval/${assinaturaId}`,
+        {
+            external_reference:
+                `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`
+        }
+    );
+
+    return resposta.data;
+}
+
+/**
+ * Upgrade imediato:
+ * altera o valor e a referência da MESMA assinatura.
+ */
+export async function fazerUpgradeAssinaturaMercadoPago({
+    assinaturaId,
+    novoValor,
+    empresaId,
+    planoId
+}: {
+    assinaturaId: string;
+    novoValor: number;
+    empresaId: number;
+    planoId: number;
+}) {
+    const resposta = await mercadoPagoApi.put(
+        `/preapproval/${assinaturaId}`,
+        {
+            external_reference:
+                `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
+
+            auto_recurring: {
+                transaction_amount: novoValor,
+                currency_id: "BRL"
+            }
+        }
+    );
+
+    return resposta.data;
+}
+
+/**
+ * Cancela novas cobranças da assinatura.
+ *
+ * A documentação atual do Mercado Pago usa "canceled".
+ */
+export async function cancelarAssinaturaMercadoPago(
+    assinaturaId: string
+) {
+    const resposta = await mercadoPagoApi.put(
+        `/preapproval/${assinaturaId}`,
+        {
+            status: "canceled"
+        }
+    );
+
+    return resposta.data;
+}
