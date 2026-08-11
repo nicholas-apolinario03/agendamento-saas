@@ -407,17 +407,68 @@ empresaRoutes.post("/assinatura/checkout", auth, async (req, res) => {
         });
     }
 });
-
+import { buscarAssinaturaMercadoPago } from "../service/mercadoPago";
+import {
+    WebhookSignatureValidator,
+    InvalidWebhookSignatureError
+} from "mercadopago";
 empresaRoutes.post("/webhook/mercado-pago", async (req, res) => {
     try {
-        console.log("WEBHOOK MERCADO PAGO:");
-        console.log(req.body);
+        const xSignature = req.headers["x-signature"];
+        const xRequestId = req.headers["x-request-id"];
+        const dataId = req.query["data.id"];
+
+        const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+
+        if (
+            typeof xSignature !== "string" ||
+            typeof xRequestId !== "string" ||
+            typeof dataId !== "string" ||
+            !secret
+        ) {
+            return res.sendStatus(401);
+        }
+
+        WebhookSignatureValidator.validate({
+            xSignature,
+            xRequestId,
+            dataId,
+            secret
+        });
+
+        const { type, data } = req.body;
+
+        if (type !== "subscription_preapproval") {
+            return res.sendStatus(200);
+        }
+
+        if (!data?.id) {
+            return res.sendStatus(200);
+        }
+
+        const assinaturaMP = await buscarAssinaturaMercadoPago(
+            String(data.id)
+        );
+
+        console.log("Assinatura válida recebida");
+        console.log("ID:", assinaturaMP.id);
+        console.log("Status:", assinaturaMP.status);
+        console.log("Email:", assinaturaMP.payer_email);
+        console.log(
+            "Plano MP:",
+            assinaturaMP.preapproval_plan_id
+        );
 
         return res.sendStatus(200);
 
     } catch (erro) {
-        console.error("Erro no webhook:", erro);
 
+        if (erro instanceof InvalidWebhookSignatureError) {
+            console.error("Webhook inválido");
+            return res.sendStatus(401);
+        }
+
+        console.error("Erro ao processar webhook:", erro);
         return res.sendStatus(500);
     }
 });

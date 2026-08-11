@@ -72,3 +72,12 @@ export async function criarAssinaturaMercadoPago({
 
     return resposta.data;
 }
+export async function buscarAssinaturaMercadoPago(
+    assinaturaId: string
+) {
+    const resposta = await mercadoPagoApi.get(
+        `/preapproval/${assinaturaId}`
+    );
+
+    return resposta.data;
+}
