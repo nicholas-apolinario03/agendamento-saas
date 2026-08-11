@@ -243,7 +243,7 @@ empresaRoutes.get(
                 if (
                     assinatura.fimTrial &&
                     agora <=
-                        assinatura.fimTrial
+                    assinatura.fimTrial
                 ) {
                     return res
                         .status(200)
@@ -268,7 +268,7 @@ empresaRoutes.get(
                 if (
                     !assinatura.fimCiclo ||
                     agora <=
-                        assinatura.fimCiclo
+                    assinatura.fimCiclo
                 ) {
                     return res
                         .status(200)
@@ -523,9 +523,9 @@ empresaRoutes.post(
 
             if (
                 assinatura.status ===
-                    "VENCIDA" ||
+                "VENCIDA" ||
                 assinatura.status ===
-                    "CANCELADA"
+                "CANCELADA"
             ) {
                 return res
                     .status(200)
@@ -800,21 +800,39 @@ empresaRoutes.post(
                     assinaturaMP.status
             });
         } catch (erro: any) {
+
             console.error(
-                "Erro ao criar assinatura:",
-                erro.response?.data ||
-                    erro.message ||
-                    erro
+                "===== ERRO MERCADO PAGO ====="
             );
 
-            const mensagemMercadoPago =
-                erro.response?.data?.message;
+            console.error(
+                "STATUS:",
+                erro.response?.status
+            );
+
+            console.error(
+                "DATA:",
+                JSON.stringify(
+                    erro.response?.data,
+                    null,
+                    2
+                )
+            );
+
+            console.error(
+                "REQUEST ID:",
+                erro.response?.headers?.["x-request-id"]
+            );
+
+            console.error(
+                "============================="
+            );
 
             return res.status(
                 erro.response?.status || 500
             ).json({
                 erro:
-                    mensagemMercadoPago ||
+                    erro.response?.data?.message ||
                     "Erro ao criar assinatura"
             });
         }
@@ -1219,8 +1237,8 @@ empresaRoutes.post(
             console.error(
                 "Erro Mercado Pago:",
                 erro.response?.data ||
-                    erro.message ||
-                    erro
+                erro.message ||
+                erro
             );
 
             return res.status(500).json({
