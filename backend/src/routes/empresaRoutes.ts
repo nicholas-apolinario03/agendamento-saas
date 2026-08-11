@@ -1708,7 +1708,7 @@ empresaRoutes.post(
                     !Number.isInteger(planoId)
                 ) {
                     console.error(
-                        "Empresa/plano inválidos:",
+                        "Empresa ou plano inválidos:",
                         referencia
                     );
 
@@ -1735,62 +1735,121 @@ empresaRoutes.post(
                     {
                         assinaturaMercadoPagoId:
                             assinaturaMP.id,
+
                         payerId:
                             assinaturaMP.payer_id,
+
                         empresaId,
+
                         planoId,
+
                         statusMercadoPago:
                             assinaturaMP.status,
+
                         externalReference:
                             referencia
                     }
                 );
 
-                // ----------------------------------------------
+                // ==============================================
                 // AUTORIZADA
-                // ----------------------------------------------
+                // ==============================================
 
                 if (
                     assinaturaMP.status ===
                     "authorized"
                 ) {
                     /*
-                     * O next_payment_date é usado como fim do
-                     * ciclo atual / próxima cobrança.
+                     * O checkout já calcula corretamente o ciclo.
+                     *
+                     * Não usamos next_payment_date aqui porque,
+                     * na ativação inicial, o Mercado Pago pode
+                     * devolver uma data praticamente igual ao
+                     * momento da criação da assinatura.
                      */
-                    let fimCiclo: Date;
 
-                    if (
-                        assinaturaMP.next_payment_date
-                    ) {
-                        fimCiclo =
-                            new Date(
-                                assinaturaMP.next_payment_date
-                            );
-                    } else {
-                        fimCiclo =
-                            new Date();
+                    let inicioCiclo =
+                        assinaturaLocal.inicioCiclo;
 
-                        fimCiclo.setMonth(
-                            fimCiclo.getMonth() + 1
+                    let fimCiclo =
+                        assinaturaLocal.fimCiclo;
+
+                    const agora =
+                        new Date();
+
+                    const cicloValido =
+                        Boolean(
+                            inicioCiclo &&
+                            fimCiclo &&
+                            fimCiclo > agora
                         );
-                    }
 
                     /*
-                     * Se a assinatura acabou de ser criada, usamos agora
-                     * como início. Se já existe um ciclo, preservamos.
-                     *
-                     * Isso evita que um webhook duplicado fique
-                     * deslocando o inicioCiclo.
+                     * Se o webhook chegar antes de o checkout
+                     * terminar a atualização local, reconstruímos
+                     * o ciclo usando a frequência real do plano.
                      */
-                    const inicioCiclo =
-                        assinaturaLocal.inicioCiclo ||
-                        new Date();
+                    if (!cicloValido) {
+                        const plano =
+                            await prisma.plano.findUnique({
+                                where: {
+                                    id:
+                                        planoId
+                                }
+                            });
+
+                        if (
+                            !plano ||
+                            !plano.mercadoPagoPlanoId
+                        ) {
+                            console.error(
+                                "Plano não encontrado para ativação:",
+                                planoId
+                            );
+
+                            return res.sendStatus(200);
+                        }
+
+                        const planoMP =
+                            await buscarPlanoMercadoPago(
+                                plano.mercadoPagoPlanoId
+                            );
+
+                        const frequency =
+                            Number(
+                                planoMP.auto_recurring
+                                    ?.frequency
+                            );
+
+                        const frequencyType =
+                            planoMP.auto_recurring
+                                ?.frequency_type;
+
+                        if (
+                            !frequency ||
+                            !frequencyType
+                        ) {
+                            throw new Error(
+                                "Frequência do plano Mercado Pago não encontrada"
+                            );
+                        }
+
+                        inicioCiclo =
+                            new Date();
+
+                        fimCiclo =
+                            calcularFimCiclo(
+                                inicioCiclo,
+                                frequency,
+                                frequencyType
+                            );
+                    }
 
                     await prisma.assinatura.update({
                         where: {
                             empresaId
                         },
+
                         data: {
                             planoId,
 
@@ -1798,10 +1857,23 @@ empresaRoutes.post(
                                 "ATIVA",
 
                             inicioCiclo,
+
                             fimCiclo,
 
+                            /*
+                             * Preserva eventual downgrade que
+                             * já esteja agendado.
+                             */
                             proximoPlanoId:
-                                assinaturaLocal.proximoPlanoId,
+                                assinaturaLocal
+                                    .proximoPlanoId,
+
+                            /*
+                             * Uma nova autorização deixa a
+                             * assinatura ativa novamente.
+                             */
+                            cancelamentoAgendado:
+                                false,
 
                             mercadoPagoAssinaturaId:
                                 String(
@@ -1819,33 +1891,37 @@ empresaRoutes.post(
                     });
 
                     console.log(
-                        `Assinatura da empresa ${empresaId} ativada no plano ${planoId}`
+                        "Assinatura sincronizada:",
+                        {
+                            empresaId,
+                            planoId,
+                            inicioCiclo,
+                            fimCiclo
+                        }
                     );
 
                     return res.sendStatus(200);
                 }
 
-                // ----------------------------------------------
+                // ==============================================
                 // CANCELADA
-                // ----------------------------------------------
+                // ==============================================
 
                 if (
                     assinaturaMP.status === "canceled" ||
                     assinaturaMP.status === "cancelled"
                 ) {
                     /*
-                     * Se o cancelamento foi solicitado pelo próprio
-                     * usuário, mantemos ATIVA localmente até fimCiclo.
-                     *
-                     * Caso o MP cancele por outro motivo e não exista
-                     * cancelamento agendado local, encerramos agora.
+                     * Se foi um cancelamento voluntário já
+                     * agendado localmente, mantemos o acesso
+                     * até fimCiclo.
                      */
                     if (
                         assinaturaLocal
                             .cancelamentoAgendado
                     ) {
                         console.log(
-                            `Renovação da empresa ${empresaId} cancelada no Mercado Pago; acesso mantido até fimCiclo`
+                            `Renovação da empresa ${empresaId} cancelada no Mercado Pago. Acesso mantido até ${assinaturaLocal.fimCiclo?.toISOString()}`
                         );
 
                         return res.sendStatus(200);
@@ -1855,9 +1931,11 @@ empresaRoutes.post(
                         where: {
                             empresaId
                         },
+
                         data: {
                             status:
                                 "CANCELADA",
+
                             proximoPlanoId:
                                 null
                         }
@@ -1870,22 +1948,19 @@ empresaRoutes.post(
                     return res.sendStatus(200);
                 }
 
-                // ----------------------------------------------
+                // ==============================================
                 // PAUSADA
-                // ----------------------------------------------
+                // ==============================================
 
                 if (
                     assinaturaMP.status ===
                     "paused"
                 ) {
-                    /*
-                     * Seu enum atual não possui PAUSADA.
-                     * Usamos VENCIDA para bloquear o acesso.
-                     */
                     await prisma.assinatura.update({
                         where: {
                             empresaId
                         },
+
                         data: {
                             status:
                                 "VENCIDA"
@@ -1907,19 +1982,13 @@ empresaRoutes.post(
             }
 
             // ==================================================
-            // 2. COBRANÇA RECORRENTE / FATURA
+            // 2. COBRANÇA RECORRENTE
             // ==================================================
 
             if (
                 type ===
                 "subscription_authorized_payment"
             ) {
-                /*
-                 * data.id = ID da fatura recorrente.
-                 *
-                 * Consultamos o Mercado Pago em vez de confiar
-                 * somente no corpo do webhook.
-                 */
                 const faturaMP =
                     await buscarFaturaMercadoPago(
                         String(data.id)
@@ -1937,35 +2006,28 @@ empresaRoutes.post(
                     return res.sendStatus(200);
                 }
 
-                /*
-                 * Encontramos a empresa pelo ID da assinatura do MP.
-                 * Aqui não precisamos extrair empresaId do
-                 * external_reference.
-                 */
                 const assinaturaLocal =
                     await prisma.assinatura.findUnique({
                         where: {
                             mercadoPagoAssinaturaId:
-                                String(preapprovalId)
+                                String(
+                                    preapprovalId
+                                )
                         }
                     });
 
                 if (!assinaturaLocal) {
                     console.error(
-                        "Assinatura local não encontrada para preapproval:",
+                        "Assinatura local não encontrada para:",
                         preapprovalId
                     );
 
                     return res.sendStatus(200);
                 }
 
-                /*
-                 * A resposta de /authorized_payments/{id} contém
-                 * payment.status. É esse status que interessa para
-                 * saber se aquela cobrança efetivamente foi aprovada.
-                 */
                 const statusPagamento =
-                    faturaMP.payment?.status;
+                    faturaMP.payment
+                        ?.status;
 
                 console.log(
                     "Cobrança recorrente Mercado Pago:",
@@ -1977,16 +2039,12 @@ empresaRoutes.post(
                             preapprovalId,
 
                         empresaId:
-                            assinaturaLocal.empresaId,
-
-                        statusFatura:
-                            faturaMP.status,
-
-                        summarized:
-                            faturaMP.summarized,
+                            assinaturaLocal
+                                .empresaId,
 
                         paymentId:
-                            faturaMP.payment?.id,
+                            faturaMP.payment
+                                ?.id,
 
                         paymentStatus:
                             statusPagamento,
@@ -2000,80 +2058,96 @@ empresaRoutes.post(
                     }
                 );
 
-                // ----------------------------------------------
+                // ==============================================
                 // PAGAMENTO APROVADO
-                // ----------------------------------------------
+                // ==============================================
 
                 if (
                     statusPagamento ===
                     "approved"
                 ) {
                     /*
-                     * Consultamos a assinatura novamente.
-                     * Depois da cobrança aprovada, o MP informa
-                     * a próxima data de pagamento.
+                     * Se há downgrade agendado, a cobrança que
+                     * acabou de ser aprovada já usa o novo valor.
+                     * Então a frequência deve ser obtida do plano
+                     * que entrará neste novo ciclo.
                      */
-                    const assinaturaMP =
-                        await buscarAssinaturaMercadoPago(
-                            String(preapprovalId)
-                        );
+                    const planoCicloId =
+                        assinaturaLocal
+                            .proximoPlanoId ??
+                        assinaturaLocal
+                            .planoId;
 
-                    let novoFimCiclo: Date;
+                    const planoCiclo =
+                        await prisma.plano.findUnique({
+                            where: {
+                                id:
+                                    planoCicloId
+                            }
+                        });
 
                     if (
-                        assinaturaMP.next_payment_date
+                        !planoCiclo ||
+                        !planoCiclo
+                            .mercadoPagoPlanoId
                     ) {
-                        novoFimCiclo =
-                            new Date(
-                                assinaturaMP.next_payment_date
-                            );
-                    } else {
-                        novoFimCiclo =
-                            new Date();
-
-                        novoFimCiclo.setMonth(
-                            novoFimCiclo.getMonth() + 1
-                        );
-                    }
-
-                    /*
-                     * WEBHOOKS PODEM SER REPETIDOS.
-                     *
-                     * Só consideramos que começou um NOVO ciclo se
-                     * o novo next_payment_date for posterior ao
-                     * fimCiclo que já temos no banco.
-                     *
-                     * Isso impede um webhook duplicado de zerar
-                     * agendamentosNoCiclo várias vezes.
-                     */
-                    const cicloAvancou =
-                        !assinaturaLocal.fimCiclo ||
-                        novoFimCiclo.getTime() >
-                            assinaturaLocal
-                                .fimCiclo
-                                .getTime();
-
-                    if (!cicloAvancou) {
-                        console.log(
-                            `Cobrança ${faturaMP.id} já refletida no ciclo da empresa ${assinaturaLocal.empresaId}`
+                        console.error(
+                            "Plano local não encontrado para renovação:",
+                            planoCicloId
                         );
 
                         return res.sendStatus(200);
                     }
 
-                    const novoInicioCiclo =
-                        assinaturaLocal.fimCiclo ||
+                    const planoMP =
+                        await buscarPlanoMercadoPago(
+                            planoCiclo
+                                .mercadoPagoPlanoId
+                        );
+
+                    const frequency =
+                        Number(
+                            planoMP.auto_recurring
+                                ?.frequency
+                        );
+
+                    const frequencyType =
+                        planoMP.auto_recurring
+                            ?.frequency_type;
+
+                    if (
+                        !frequency ||
+                        !frequencyType
+                    ) {
+                        throw new Error(
+                            "Frequência do plano Mercado Pago não encontrada"
+                        );
+                    }
+
+                    const agora =
                         new Date();
 
                     /*
-                     * Se havia downgrade agendado, essa cobrança
-                     * já foi feita com o novo valor porque alteramos
-                     * o transaction_amount quando o usuário pediu
-                     * o downgrade.
-                     *
-                     * Agora que o novo ciclo começou, aplicamos
-                     * também o plano local.
+                     * A nova cobrança representa um novo ciclo.
+                     * Se o fim anterior estiver no futuro por
+                     * diferença de processamento, começamos dele.
+                     * Caso contrário, começamos agora.
                      */
+                    const novoInicioCiclo =
+                        assinaturaLocal.fimCiclo &&
+                        assinaturaLocal.fimCiclo >
+                            agora
+                            ? assinaturaLocal
+                                .fimCiclo
+                            : agora;
+
+                    const novoFimCiclo =
+                        calcularFimCiclo(
+                            novoInicioCiclo,
+                            frequency,
+                            frequencyType
+                        );
+
                     let planoIdNovo =
                         assinaturaLocal.planoId;
 
@@ -2082,6 +2156,9 @@ empresaRoutes.post(
                         assinaturaLocal
                             .proximoPlanoId;
 
+                    /*
+                     * DOWNGRADE AGENDADO
+                     */
                     if (
                         assinaturaLocal
                             .proximoPlanoId
@@ -2096,11 +2173,6 @@ empresaRoutes.post(
                             });
 
                         if (proximoPlano) {
-                            /*
-                             * Atualizamos também a external_reference
-                             * para os próximos eventos da assinatura
-                             * apontarem para o plano correto.
-                             */
                             await atualizarReferenciaAssinaturaMercadoPago(
                                 String(
                                     preapprovalId
@@ -2124,6 +2196,7 @@ empresaRoutes.post(
                                 assinaturaLocal
                                     .empresaId
                         },
+
                         data: {
                             planoId:
                                 planoIdNovo,
@@ -2141,7 +2214,10 @@ empresaRoutes.post(
                                 novoFimCiclo,
 
                             agendamentosNoCiclo:
-                                0
+                                0,
+
+                            cancelamentoAgendado:
+                                false
                         }
                     });
 
@@ -2152,72 +2228,50 @@ empresaRoutes.post(
                     return res.sendStatus(200);
                 }
 
-                // ----------------------------------------------
-                // PAGAMENTO RECUSADO
-                // ----------------------------------------------
+                // ==============================================
+                // PAGAMENTO RECUSADO / CANCELADO
+                // ==============================================
 
                 if (
-                    statusPagamento ===
-                    "rejected" ||
-                    statusPagamento ===
-                    "cancelled"
+                    statusPagamento === "rejected" ||
+                    statusPagamento === "cancelled"
                 ) {
                     /*
-                     * NÃO marcamos VENCIDA imediatamente.
-                     *
-                     * O Mercado Pago pode realizar novas tentativas
-                     * de cobrança. Além disso, a empresa já pagou
-                     * pelo ciclo atual e deve continuar com acesso
-                     * até fimCiclo.
-                     *
-                     * Como fimCiclo não é estendido aqui, a rota
-                     * /empresa/acesso bloqueará naturalmente quando
-                     * o ciclo já pago terminar.
+                     * Não encerramos na primeira falha.
+                     * O fimCiclo atual não é estendido e o MP
+                     * ainda pode realizar novas tentativas.
                      */
                     console.warn(
-                        `Cobrança da empresa ${assinaturaLocal.empresaId} não aprovada. Status: ${statusPagamento}. O ciclo não será estendido.`
+                        `Cobrança da empresa ${assinaturaLocal.empresaId} não aprovada. Status: ${statusPagamento}. fimCiclo não será estendido.`
                     );
 
                     return res.sendStatus(200);
                 }
 
-                // ----------------------------------------------
-                // PENDENTE / EM PROCESSAMENTO
-                // ----------------------------------------------
+                // ==============================================
+                // PENDENTE
+                // ==============================================
 
                 if (
-                    statusPagamento ===
-                        "pending" ||
-                    statusPagamento ===
-                        "in_process"
+                    statusPagamento === "pending" ||
+                    statusPagamento === "in_process"
                 ) {
                     console.log(
-                        `Cobrança da empresa ${assinaturaLocal.empresaId} ainda está pendente.`
+                        `Cobrança da empresa ${assinaturaLocal.empresaId} ainda está pendente`
                     );
 
                     return res.sendStatus(200);
                 }
 
-                /*
-                 * Em algumas fases da fatura pode ainda não existir
-                 * payment.status. Não alteramos o acesso até uma
-                 * atualização posterior do Mercado Pago.
-                 */
                 console.log(
-                    `Cobrança ${faturaMP.id} sem resultado final. Nenhuma alteração aplicada.`
+                    `Cobrança ${faturaMP.id} sem resultado final; nenhuma alteração aplicada`
                 );
 
                 return res.sendStatus(200);
             }
 
-            /*
-             * Outros eventos são ignorados por enquanto.
-             *
-             * O Mercado Pago também recomenda habilitar o tópico
-             * "payment" para acompanhar os pagamentos vinculados
-             * às assinaturas. Podemos adicionar isso na próxima etapa.
-             */
             return res.sendStatus(200);
+
         } catch (erro) {
             if (
                 erro instanceof
