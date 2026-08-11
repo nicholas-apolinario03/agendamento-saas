@@ -308,9 +308,42 @@ empresaRoutes.get(
                 ) {
                     return res.status(200).json({
                         acesso: true,
-                        status: "ATIVA",
+
+                        status:
+                            "ATIVA",
+
                         fimCiclo:
-                            assinatura.fimCiclo
+                            assinatura.fimCiclo,
+
+                        cancelamentoAgendado:
+                            assinatura
+                                .cancelamentoAgendado
+                    });
+                }
+
+                /*
+                 * A renovação foi cancelada anteriormente e o
+                 * período já pago terminou.
+                 */
+                if (
+                    assinatura
+                        .cancelamentoAgendado
+                ) {
+                    await prisma.assinatura.update({
+                        where: {
+                            empresaId:
+                                usuario.empresaId
+                        },
+                        data: {
+                            status:
+                                "CANCELADA"
+                        }
+                    });
+
+                    return res.status(403).json({
+                        acesso: false,
+                        motivo:
+                            "ASSINATURA_CANCELADA"
                     });
                 }
 
@@ -371,6 +404,103 @@ empresaRoutes.get(
             return res.status(500).json({
                 erro:
                     "Erro ao buscar planos"
+            });
+        }
+    }
+);
+
+// ======================================================
+// DADOS DA ASSINATURA DA EMPRESA
+// ======================================================
+
+empresaRoutes.get(
+    "/empresa/assinatura",
+    auth,
+    async (req, res) => {
+        try {
+            const usuario =
+                (req as any).usuario;
+
+            const assinatura =
+                await prisma.assinatura.findUnique({
+                    where: {
+                        empresaId:
+                            usuario.empresaId
+                    },
+                    include: {
+                        plano: true,
+                        proximoPlano: true
+                    }
+                });
+
+            if (!assinatura) {
+                return res.status(404).json({
+                    erro:
+                        "Assinatura não encontrada"
+                });
+            }
+
+            return res.status(200).json({
+                status:
+                    assinatura.status,
+
+                inicioCiclo:
+                    assinatura.inicioCiclo,
+
+                fimCiclo:
+                    assinatura.fimCiclo,
+
+                inicioTrial:
+                    assinatura.inicioTrial,
+
+                fimTrial:
+                    assinatura.fimTrial,
+
+                cancelamentoAgendado:
+                    assinatura.cancelamentoAgendado,
+
+                plano: {
+                    id:
+                        assinatura.plano.id,
+
+                    nome:
+                        assinatura.plano.nome,
+
+                    preco:
+                        assinatura.plano.preco,
+
+                    limiteAgendamentos:
+                        assinatura.plano
+                            .limiteAgendamentos
+                },
+
+                proximoPlano:
+                    assinatura.proximoPlano
+                        ? {
+                            id:
+                                assinatura
+                                    .proximoPlano.id,
+
+                            nome:
+                                assinatura
+                                    .proximoPlano.nome,
+
+                            preco:
+                                assinatura
+                                    .proximoPlano.preco
+                        }
+                        : null
+            });
+
+        } catch (erro) {
+            console.error(
+                "Erro ao buscar assinatura:",
+                erro
+            );
+
+            return res.status(500).json({
+                erro:
+                    "Erro ao buscar assinatura"
             });
         }
     }
@@ -518,6 +648,15 @@ empresaRoutes.post(
                     return res.status(400).json({
                         erro:
                             "Assinatura Mercado Pago não encontrada"
+                    });
+                }
+
+                if (
+                    assinatura.cancelamentoAgendado
+                ) {
+                    return res.status(409).json({
+                        erro:
+                            "A renovação desta assinatura está cancelada. Faça uma nova assinatura após o fim do ciclo para trocar de plano."
                     });
                 }
 
@@ -880,6 +1019,9 @@ empresaRoutes.post(
                         proximoPlanoId:
                             null,
 
+                        cancelamentoAgendado:
+                            false,
+
                         mercadoPagoAssinaturaId:
                             String(
                                 assinaturaMP.id
@@ -952,7 +1094,7 @@ empresaRoutes.post(
 
 
 // ======================================================
-// CANCELAR ASSINATURA
+// CANCELAR RENOVAÇÃO
 // ======================================================
 
 empresaRoutes.post(
@@ -989,6 +1131,15 @@ empresaRoutes.post(
             }
 
             if (
+                assinatura.cancelamentoAgendado
+            ) {
+                return res.status(400).json({
+                    erro:
+                        "A renovação já está cancelada"
+                });
+            }
+
+            if (
                 !assinatura
                     .mercadoPagoAssinaturaId
             ) {
@@ -998,6 +1149,12 @@ empresaRoutes.post(
                 });
             }
 
+            /*
+             * Cancela novas cobranças no Mercado Pago.
+             *
+             * Localmente, NÃO mudamos para CANCELADA agora:
+             * o cliente continua com acesso até fimCiclo.
+             */
             const assinaturaMP =
                 await cancelarAssinaturaMercadoPago(
                     assinatura
@@ -1010,8 +1167,8 @@ empresaRoutes.post(
                         usuario.empresaId
                 },
                 data: {
-                    status:
-                        "CANCELADA",
+                    cancelamentoAgendado:
+                        true,
 
                     proximoPlanoId:
                         null
@@ -1020,15 +1177,20 @@ empresaRoutes.post(
 
             return res.status(200).json({
                 sucesso: true,
+
                 mensagem:
-                    "Assinatura cancelada com sucesso",
+                    "Renovação cancelada. O acesso continuará até o fim do ciclo atual.",
+
+                fimCiclo:
+                    assinatura.fimCiclo,
+
                 statusMercadoPago:
                     assinaturaMP.status
             });
 
         } catch (erro: any) {
             console.error(
-                "Erro ao cancelar assinatura:",
+                "Erro ao cancelar renovação:",
                 erro.response?.data ||
                     erro.message ||
                     erro
@@ -1039,7 +1201,7 @@ empresaRoutes.post(
             ).json({
                 erro:
                     erro.response?.data?.message ||
-                    "Erro ao cancelar assinatura"
+                    "Erro ao cancelar renovação"
             });
         }
     }
@@ -1273,6 +1435,24 @@ empresaRoutes.post(
                     assinaturaMP.status === "canceled" ||
                     assinaturaMP.status === "cancelled"
                 ) {
+                    /*
+                     * Se o cancelamento foi solicitado pelo próprio
+                     * usuário, mantemos ATIVA localmente até fimCiclo.
+                     *
+                     * Caso o MP cancele por outro motivo e não exista
+                     * cancelamento agendado local, encerramos agora.
+                     */
+                    if (
+                        assinaturaLocal
+                            .cancelamentoAgendado
+                    ) {
+                        console.log(
+                            `Renovação da empresa ${empresaId} cancelada no Mercado Pago; acesso mantido até fimCiclo`
+                        );
+
+                        return res.sendStatus(200);
+                    }
+
                     await prisma.assinatura.update({
                         where: {
                             empresaId

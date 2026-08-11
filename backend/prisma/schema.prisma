@@ -181,7 +181,7 @@ model Assinatura {
   proximoPlanoId Int?
 
   status StatusAssinatura @default(TRIAL)
-
+  cancelamentoAgendado Boolean @default(false)
   inicioTrial DateTime?
   fimTrial    DateTime?
 
