@@ -161,13 +161,31 @@ export default function Planos() {
                     ""
                 );
 
+                /*
+                 * A assinatura usa a Public Key que já funciona
+                 * com o fluxo /preapproval.
+                 *
+                 * A cobrança proporcional do upgrade usa a
+                 * Public Key correspondente ao Access Token
+                 * com escopo payment.
+                 */
                 const publicKey =
-                    import.meta.env
-                        .VITE_MERCADO_PAGO_PUBLIC_KEY;
+                    pagamento.tipo ===
+                        "UPGRADE"
+                        ? (
+                            import.meta.env
+                                .VITE_MERCADO_PAGO_PAYMENT_PUBLIC_KEY ||
+                            import.meta.env
+                                .VITE_MERCADO_PAGO_PUBLIC_KEY
+                        )
+                        : import.meta.env
+                            .VITE_MERCADO_PAGO_PUBLIC_KEY;
 
                 if (!publicKey) {
                     throw new Error(
-                        "VITE_MERCADO_PAGO_PUBLIC_KEY não configurada"
+                        pagamento.tipo === "UPGRADE"
+                            ? "VITE_MERCADO_PAGO_PAYMENT_PUBLIC_KEY não configurada"
+                            : "VITE_MERCADO_PAGO_PUBLIC_KEY não configurada"
                     );
                 }
 

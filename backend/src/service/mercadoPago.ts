@@ -9,6 +9,29 @@ const mercadoPagoApi = axios.create({
     }
 });
 
+
+/*
+ * API separada para cobranças avulsas do upgrade.
+ *
+ * Em teste:
+ * MERCADO_PAGO_PAYMENT_ACCESS_TOKEN = Access Token da área
+ * "Credenciais de teste" da aplicação.
+ *
+ * Em produção:
+ * use um Access Token produtivo com escopo "payment".
+ */
+const mercadoPagoPaymentApi = axios.create({
+    baseURL: "https://api.mercadopago.com",
+    headers: {
+        Authorization:
+            `Bearer ${
+                process.env.MERCADO_PAGO_PAYMENT_ACCESS_TOKEN ||
+                process.env.MERCADO_PAGO_ACCESS_TOKEN
+            }`,
+        "Content-Type": "application/json"
+    }
+});
+
 // ======================================================
 // PLANOS
 // ======================================================
@@ -320,7 +343,7 @@ export async function criarPagamentoUpgradeMercadoPago({
     }
 
     const resposta =
-        await mercadoPagoApi.post(
+        await mercadoPagoPaymentApi.post(
             "/v1/payments",
             body,
             {
