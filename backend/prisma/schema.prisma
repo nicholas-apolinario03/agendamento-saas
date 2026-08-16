@@ -179,6 +179,7 @@ model Assinatura {
   empresaId      Int  @unique
   planoId        Int
   proximoPlanoId Int?
+  ultimoPagamentoMercadoPagoId String? @unique
 
   status StatusAssinatura @default(TRIAL)
   cancelamentoAgendado Boolean @default(false)
