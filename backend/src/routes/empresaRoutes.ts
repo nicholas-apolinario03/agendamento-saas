@@ -4,11 +4,11 @@ import bcrypt from "bcrypt";
 import {
     WebhookSignatureValidator,
     InvalidWebhookSignatureError,
-    } from "mercadopago";,
-    import { prisma } from "../lib/prisma";,
-    import { auth } from "../middleware/auth";,
-    import { gerartoken } from "../service/jwt";,
-    import {,
+    } from "mercadopago";
+    import { prisma } from "../lib/prisma";
+    import { auth } from "../middleware/auth";
+    import { gerartoken } from "../service/jwt";
+    import {
     alterarValorAssinaturaMercadoPago,
     atualizarReferenciaAssinaturaMercadoPago,
     buscarAssinaturaMercadoPago,
