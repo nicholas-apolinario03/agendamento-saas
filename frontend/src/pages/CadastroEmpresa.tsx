@@ -204,6 +204,8 @@ export function CadastroEmpresa() {
                     <Link to="/login">
                         Entrar
                     </Link>
+                    <br />
+                    <Link to="/">Voltar</Link>
                 </footer>
             </form>
         </main>

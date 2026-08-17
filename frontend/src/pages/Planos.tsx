@@ -3,11 +3,11 @@ import {
     useRef,
     useState
 } from "react";
-
+import Header from "../components/Header";
 import {
     useNavigate
 } from "react-router-dom";
-
+import "../components/css/Planos.css"
 import {
     loadMercadoPago
 } from "@mercadopago/sdk-js";
@@ -62,8 +62,8 @@ type RespostaAssinatura = {
 
 type PagamentoPendente = {
     tipo:
-        | "NOVA_ASSINATURA"
-        | "UPGRADE";
+    | "NOVA_ASSINATURA"
+    | "UPGRADE";
 
     plano: Plano;
 
@@ -354,7 +354,7 @@ export default function Planos() {
                                         const installments =
                                             Number(
                                                 dados.installments ||
-                                                    1
+                                                1
                                             );
 
                                         const issuerId =
@@ -491,7 +491,7 @@ export default function Planos() {
                                         );
 
                                     } catch (
-                                        erro: any
+                                    erro: any
                                     ) {
                                         console.error(
                                             "Erro no pagamento:",
@@ -620,7 +620,7 @@ export default function Planos() {
                 resposta.data;
 
             switch (
-                dados.acao
+            dados.acao
             ) {
                 case "AGENDADO_APOS_TRIAL":
                     alert(
@@ -661,7 +661,7 @@ export default function Planos() {
                     const valor =
                         Number(
                             dados.valorProporcional ||
-                                0
+                            0
                         );
 
                     const dataFim =
@@ -681,13 +681,13 @@ export default function Planos() {
                                     ".",
                                     ","
                                 )}. A próxima renovação será de R$ ${Number(
-                                plano.preco
-                            )
-                                .toFixed(2)
-                                .replace(
-                                    ".",
-                                    ","
-                                )} em ${dataFim}. Deseja continuar?`
+                                    plano.preco
+                                )
+                                    .toFixed(2)
+                                    .replace(
+                                        ".",
+                                        ","
+                                    )} em ${dataFim}. Deseja continuar?`
                         );
 
                     if (confirmar) {
@@ -724,12 +724,12 @@ export default function Planos() {
                 default:
                     alert(
                         dados.erro ||
-                            "Não foi possível selecionar o plano."
+                        "Não foi possível selecionar o plano."
                     );
             }
 
         } catch (
-            erro: any
+        erro: any
         ) {
             console.error(
                 "Erro ao selecionar plano:",
@@ -740,7 +740,7 @@ export default function Planos() {
                 erro.response
                     ?.data
                     ?.erro ||
-                    "Não foi possível selecionar o plano."
+                "Não foi possível selecionar o plano."
             );
 
         } finally {
@@ -759,298 +759,283 @@ export default function Planos() {
     }
 
     return (
-        <main>
-            <h1>
-                Escolha seu plano
-            </h1>
+        <div>
+            <Header></Header>
+            <main className="pagina-planos">
 
-            {planos.map(
-                (plano) => (
-                    <div
-                        key={
-                            plano.id
-                        }
-                    >
-                        <h2>
-                            {
-                                plano.nome
-                            }
-                        </h2>
+                <div className="pagina-planos__conteudo">
+
+                    <div className="pagina-planos__cabecalho">
+                        <h1>
+                            Escolha seu plano
+                        </h1>
 
                         <p>
-                            R${" "}
-                            {Number(
-                                plano.preco
-                            )
-                                .toFixed(
-                                    2
-                                )
-                                .replace(
-                                    ".",
-                                    ","
-                                )}
-                            /mês
+                            Escolha o plano que melhor atende
+                            às necessidades da sua empresa.
                         </p>
-
-                        <p>
-                            Até{" "}
-                            {
-                                plano.limiteAgendamentos
-                            }{" "}
-                            agendamentos
-                            por mês
-                        </p>
-
-                        <button
-                            disabled={
-                                processandoPlanoId !==
-                                null
-                            }
-
-                            onClick={() =>
-                                assinarPlano(
-                                    plano
-                                )
-                            }
-                        >
-                            {processandoPlanoId ===
-                            plano.id
-                                ? "Processando..."
-                                : `Assinar ${plano.nome}`}
-                        </button>
                     </div>
-                )
-            )}
 
-            {pagamentoPendente && (
-                <section>
-                    <hr />
+                    <div className="grid-planos">
+                        {planos.map((plano) => (
+                            <div
+                                className="card-plano"
+                                key={plano.id}
+                            >
+                                <h2>
+                                    {plano.nome}
+                                </h2>
 
-                    <h2>
-                        {pagamentoPendente.tipo ===
-                        "UPGRADE"
-                            ? `Upgrade para ${pagamentoPendente.plano.nome}`
-                            : `Pagamento — ${pagamentoPendente.plano.nome}`}
-                    </h2>
+                                <p className="card-plano__preco">
+                                    <strong>
+                                        R${" "}
+                                        {Number(plano.preco)
+                                            .toFixed(2)
+                                            .replace(".", ",")}
+                                    </strong>
 
-                    {pagamentoPendente.tipo ===
-                    "UPGRADE" ? (
-                        <>
-                            <p>
-                                Cobrança
-                                proporcional
-                                agora:{" "}
-                                <strong>
+                                    <span>
+                                        /mês
+                                    </span>
+                                </p>
+
+                                <p className="card-plano__limite">
+                                    Até{" "}
+                                    <strong>
+                                        {
+                                            plano.limiteAgendamentos
+                                        }
+                                    </strong>{" "}
+                                    agendamentos por mês
+                                </p>
+
+                                <button
+                                    className="card-plano__botao"
+                                    disabled={
+                                        processandoPlanoId !== null
+                                    }
+                                    onClick={() =>
+                                        assinarPlano(plano)
+                                    }
+                                >
+                                    {processandoPlanoId ===
+                                        plano.id
+                                        ? "Processando..."
+                                        : `Assinar ${plano.nome}`}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {pagamentoPendente && (
+                        <section className="pagamento-plano">
+                            <hr />
+
+                            <h2>
+                                {pagamentoPendente.tipo ===
+                                    "UPGRADE"
+                                    ? `Upgrade para ${pagamentoPendente.plano.nome}`
+                                    : `Pagamento — ${pagamentoPendente.plano.nome}`}
+                            </h2>
+
+                            {pagamentoPendente.tipo ===
+                                "UPGRADE" ? (
+                                <>
+                                    <p>
+                                        Cobrança proporcional agora:{" "}
+                                        <strong>
+                                            R${" "}
+                                            {Number(
+                                                pagamentoPendente.valor
+                                            )
+                                                .toFixed(2)
+                                                .replace(".", ",")}
+                                        </strong>
+                                    </p>
+
+                                    <p>
+                                        Próximas renovações: R${" "}
+                                        {Number(
+                                            pagamentoPendente
+                                                .plano
+                                                .preco
+                                        )
+                                            .toFixed(2)
+                                            .replace(".", ",")}
+                                        /mês
+                                    </p>
+                                </>
+                            ) : (
+                                <p>
                                     R${" "}
                                     {Number(
                                         pagamentoPendente.valor
                                     )
-                                        .toFixed(
-                                            2
-                                        )
-                                        .replace(
-                                            ".",
-                                            ","
-                                        )}
-                                </strong>
-                            </p>
+                                        .toFixed(2)
+                                        .replace(".", ",")}
+                                    /mês
+                                </p>
+                            )}
 
                             <p>
-                                Próximas
-                                renovações: R${" "}
-                                {Number(
-                                    pagamentoPendente
-                                        .plano
-                                        .preco
-                                )
-                                    .toFixed(
-                                        2
-                                    )
-                                    .replace(
-                                        ".",
-                                        ","
-                                    )}
-                                /mês
+                                Os dados sensíveis do cartão
+                                são processados pelo Mercado Pago.
                             </p>
-                        </>
-                    ) : (
-                        <p>
-                            R${" "}
-                            {Number(
-                                pagamentoPendente.valor
-                            )
-                                .toFixed(
-                                    2
-                                )
-                                .replace(
-                                    ".",
-                                    ","
-                                )}
-                            /mês
-                        </p>
+
+                            <form
+                                id="form-checkout"
+                                className="formulario-pagamento"
+                            >
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        Número do cartão
+                                    </label>
+
+                                    <div
+                                        id="form-checkout__cardNumber"
+                                        className="container"
+                                        style={{
+                                            minHeight:
+                                                "38px"
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        Validade
+                                    </label>
+
+                                    <div
+                                        id="form-checkout__expirationDate"
+                                        className="container"
+                                        style={{
+                                            minHeight:
+                                                "38px"
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        CVV
+                                    </label>
+
+                                    <div
+                                        id="form-checkout__securityCode"
+                                        className="container"
+                                        style={{
+                                            minHeight:
+                                                "38px"
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        Nome no cartão
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        id="form-checkout__cardholderName"
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        Banco emissor
+                                    </label>
+
+                                    <select
+                                        id="form-checkout__issuer"
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        Parcelas
+                                    </label>
+
+                                    <select
+                                        id="form-checkout__installments"
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        Documento
+                                    </label>
+
+                                    <select
+                                        id="form-checkout__identificationType"
+                                    />
+
+                                    <input
+                                        type="text"
+                                        id="form-checkout__identificationNumber"
+                                        placeholder="CPF"
+                                    />
+                                </div>
+
+                                <div className="formulario-pagamento__campo">
+                                    <label>
+                                        E-mail
+                                    </label>
+
+                                    <input
+                                        type="email"
+                                        id="form-checkout__cardholderEmail"
+                                    />
+                                </div>
+
+                                <button
+                                    className="formulario-pagamento__botao"
+                                    type="submit"
+                                    id="form-checkout__submit"
+                                >
+                                    {pagamentoPendente.tipo ===
+                                        "UPGRADE"
+                                        ? "Pagar diferença e fazer upgrade"
+                                        : "Confirmar assinatura"}
+                                </button>
+
+                                <button
+                                    className="formulario-pagamento__botao-secundario"
+                                    type="button"
+                                    onClick={() => {
+                                        setPagamentoPendente(
+                                            null
+                                        );
+
+                                        setMensagemPagamento(
+                                            ""
+                                        );
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+
+                                <progress
+                                    value="0"
+                                    className="progress-bar"
+                                >
+                                    Carregando...
+                                </progress>
+                            </form>
+
+                            {mensagemPagamento && (
+                                <p className="formulario-pagamento__mensagem">
+                                    {
+                                        mensagemPagamento
+                                    }
+                                </p>
+                            )}
+                        </section>
                     )}
 
-                    <p>
-                        Os dados sensíveis
-                        do cartão são
-                        processados pelo
-                        Mercado Pago.
-                    </p>
-
-                    <form
-                        id=
-                            "form-checkout"
-                    >
-                        <label>
-                            Número do cartão
-                        </label>
-
-                        <div
-                            id=
-                                "form-checkout__cardNumber"
-                            className=
-                                "container"
-                            style={{
-                                minHeight:
-                                    "38px"
-                            }}
-                        />
-
-                        <label>
-                            Validade
-                        </label>
-
-                        <div
-                            id=
-                                "form-checkout__expirationDate"
-                            className=
-                                "container"
-                            style={{
-                                minHeight:
-                                    "38px"
-                            }}
-                        />
-
-                        <label>
-                            CVV
-                        </label>
-
-                        <div
-                            id=
-                                "form-checkout__securityCode"
-                            className=
-                                "container"
-                            style={{
-                                minHeight:
-                                    "38px"
-                            }}
-                        />
-
-                        <label>
-                            Nome no cartão
-                        </label>
-
-                        <input
-                            type=
-                                "text"
-                            id=
-                                "form-checkout__cardholderName"
-                        />
-
-                        <label>
-                            Banco emissor
-                        </label>
-
-                        <select
-                            id=
-                                "form-checkout__issuer"
-                        />
-
-                        <label>
-                            Parcelas
-                        </label>
-
-                        <select
-                            id=
-                                "form-checkout__installments"
-                        />
-
-                        <label>
-                            Documento
-                        </label>
-
-                        <select
-                            id=
-                                "form-checkout__identificationType"
-                        />
-
-                        <input
-                            type=
-                                "text"
-                            id=
-                                "form-checkout__identificationNumber"
-                            placeholder=
-                                "CPF"
-                        />
-
-                        <label>
-                            E-mail
-                        </label>
-
-                        <input
-                            type=
-                                "email"
-                            id=
-                                "form-checkout__cardholderEmail"
-                        />
-
-                        <button
-                            type=
-                                "submit"
-                            id=
-                                "form-checkout__submit"
-                        >
-                            {pagamentoPendente.tipo ===
-                            "UPGRADE"
-                                ? "Pagar diferença e fazer upgrade"
-                                : "Confirmar assinatura"}
-                        </button>
-
-                        <button
-                            type=
-                                "button"
-
-                            onClick={() => {
-                                setPagamentoPendente(
-                                    null
-                                );
-
-                                setMensagemPagamento(
-                                    ""
-                                );
-                            }}
-                        >
-                            Cancelar
-                        </button>
-
-                        <progress
-                            value="0"
-                            className=
-                                "progress-bar"
-                        >
-                            Carregando...
-                        </progress>
-                    </form>
-
-                    {mensagemPagamento && (
-                        <p>
-                            {
-                                mensagemPagamento
-                            }
-                        </p>
-                    )}
-                </section>
-            )}
-        </main>
+                </div>
+            </main>
+        </div>
     );
 }

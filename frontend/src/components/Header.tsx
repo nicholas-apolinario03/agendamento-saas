@@ -76,10 +76,10 @@ export default function Header() {
                         </a>
 
                         <a
-                            href="#recursos"
+                            href="/planos"
                             className="header-principal__link"
                         >
-                            Recursos
+                            Planos
                         </a>
 
                         <Link

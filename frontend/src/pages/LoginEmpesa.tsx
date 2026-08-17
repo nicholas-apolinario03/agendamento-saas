@@ -180,7 +180,10 @@ export function LoginEmpresas() {
 
                     <Link to="/cadastro">
                          Criar conta
+                         
                     </Link>
+                    <br />
+                    <Link to="/">Voltar</Link>
                 </footer>
             </form>
         </main>

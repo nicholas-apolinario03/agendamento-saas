@@ -1,0 +1,264 @@
+/* ======================================================
+   PÁGINA
+====================================================== */
+
+.pagina-planos {
+    min-height: 100vh;
+
+    padding: 48px 32px;
+
+    box-sizing: border-box;
+
+    background: #f5f7fa;
+}
+
+.pagina-planos__conteudo {
+    width: 100%;
+    max-width: 1200px;
+
+    margin: 0 auto;
+}
+
+
+/* ======================================================
+   CABEÇALHO
+====================================================== */
+
+.pagina-planos__cabecalho {
+    text-align: center;
+
+    margin-bottom: 42px;
+}
+
+.pagina-planos__cabecalho h1 {
+    margin: 0;
+
+    color: #111827;
+
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.pagina-planos__cabecalho p {
+    max-width: 600px;
+
+    margin: 12px auto 0;
+
+    color: #6b7280;
+
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+
+/* ======================================================
+   GRID DOS PLANOS
+====================================================== */
+
+.grid-planos {
+    display: grid;
+
+    /*
+     * No máximo 3 planos por linha.
+     */
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 28px;
+
+    /*
+     * Mantém o conjunto centralizado.
+     */
+    width: 100%;
+    max-width: 1050px;
+
+    margin: 0 auto;
+
+    align-items: stretch;
+}
+
+
+/* ======================================================
+   CARD
+====================================================== */
+
+.card-plano {
+    display: flex;
+    flex-direction: column;
+
+    min-height: 330px;
+
+    padding: 36px 32px;
+
+    box-sizing: border-box;
+
+    background: #ffffff;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+
+    box-shadow:
+        0 10px 35px rgba(0, 0, 0, 0.08);
+
+    text-align: center;
+
+    transition:
+        transform .2s,
+        box-shadow .2s,
+        border-color .2s;
+}
+
+.card-plano:hover {
+    transform: translateY(-4px);
+
+    border-color: #d1d5db;
+
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.11);
+}
+
+
+/* ======================================================
+   NOME DO PLANO
+====================================================== */
+
+.card-plano h2 {
+    margin: 0 0 24px;
+
+    color: #111827;
+
+    font-size: 24px;
+    font-weight: 700;
+}
+
+
+/* ======================================================
+   PREÇO
+====================================================== */
+
+.card-plano__preco {
+    display: flex;
+
+    justify-content: center;
+    align-items: baseline;
+
+    gap: 5px;
+
+    margin: 0 0 24px;
+}
+
+.card-plano__preco strong {
+    color: #111827;
+
+    font-size: 34px;
+    font-weight: 700;
+}
+
+.card-plano__preco span {
+    color: #6b7280;
+
+    font-size: 14px;
+}
+
+
+/* ======================================================
+   LIMITE
+====================================================== */
+
+.card-plano__limite {
+    margin: 0 0 32px;
+
+    color: #6b7280;
+
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.card-plano__limite strong {
+    color: #374151;
+}
+
+
+/* ======================================================
+   BOTÃO
+====================================================== */
+
+.card-plano__botao {
+    width: 100%;
+    height: 48px;
+
+    margin-top: auto;
+
+    border: none;
+    border-radius: 10px;
+
+    background: var(--cor-botao);
+
+    color: var(--cor-botao-texto);
+
+    font-size: 15px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: .2s;
+}
+
+.card-plano__botao:hover:not(:disabled) {
+    background: #252525;
+}
+
+.card-plano__botao:disabled {
+    opacity: .6;
+
+    cursor: not-allowed;
+}
+
+
+/* ======================================================
+   RESPONSIVO
+====================================================== */
+
+@media (max-width: 900px) {
+
+    .grid-planos {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+        max-width: 700px;
+    }
+}
+
+
+@media (max-width: 600px) {
+
+    .pagina-planos {
+        padding: 32px 20px;
+    }
+
+    .pagina-planos__cabecalho {
+        margin-bottom: 30px;
+    }
+
+    .pagina-planos__cabecalho h1 {
+        font-size: 28px;
+    }
+
+    .grid-planos {
+        grid-template-columns: 1fr;
+
+        max-width: 420px;
+
+        gap: 20px;
+    }
+
+    .card-plano {
+        min-height: 0;
+
+        padding: 32px 24px;
+    }
+
+    .card-plano__preco strong {
+        font-size: 30px;
+    }
+}
