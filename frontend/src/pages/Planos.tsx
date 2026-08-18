@@ -357,7 +357,10 @@ export default function Planos() {
                                         const deviceId =
                                             window
                                                 .MP_DEVICE_SESSION_ID;
-
+                                        console.log(
+                                            "MP_DEVICE_SESSION_ID:",
+                                            deviceId
+                                        );
                                         const cardTokenId =
                                             dados.token;
 
