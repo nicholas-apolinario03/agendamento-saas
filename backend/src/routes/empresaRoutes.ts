@@ -3,12 +3,22 @@ import bcrypt from "bcrypt";
 
 import {
     WebhookSignatureValidator,
-    InvalidWebhookSignatureError,
-    } from "mercadopago";
-    import { prisma } from "../lib/prisma";
-    import { auth } from "../middleware/auth";
-    import { gerartoken } from "../service/jwt";
-    import {
+    InvalidWebhookSignatureError
+} from "mercadopago";
+
+import {
+    prisma
+} from "../lib/prisma";
+
+import {
+    auth
+} from "../middleware/auth";
+
+import {
+    gerartoken
+} from "../service/jwt";
+
+import {
     alterarValorAssinaturaMercadoPago,
     atualizarReferenciaAssinaturaMercadoPago,
     buscarAssinaturaMercadoPago,
@@ -906,7 +916,8 @@ empresaRoutes.post(
                 cardTokenId,
                 paymentMethodId,
                 installments,
-                issuerId
+                issuerId,
+                deviceId
             } = req.body;
 
             if (
@@ -1095,7 +1106,12 @@ empresaRoutes.post(
                             assinatura.planoId,
 
                         planoNovoId:
-                            planoNovo.id
+                            planoNovo.id,
+
+                        deviceId:
+                            typeof deviceId === "string"
+                                ? deviceId
+                                : undefined
                     });
 
                 if (
@@ -1219,7 +1235,8 @@ empresaRoutes.post(
 
             const {
                 planoId,
-                cardTokenId
+                cardTokenId,
+                deviceId
             } = req.body;
 
             if (
@@ -1345,7 +1362,12 @@ empresaRoutes.post(
                         plano.id,
 
                     email:
-                        usuario.email
+                        usuario.email,
+
+                    deviceId:
+                        typeof deviceId === "string"
+                            ? deviceId
+                            : undefined
                 });
 
             if (!assinaturaMP?.id) {

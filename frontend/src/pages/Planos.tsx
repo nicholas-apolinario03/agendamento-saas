@@ -23,6 +23,7 @@ import {
 declare global {
     interface Window {
         MercadoPago: any;
+        MP_DEVICE_SESSION_ID?: string;
     }
 }
 
@@ -345,6 +346,18 @@ export default function Planos() {
                                             cardFormRef.current
                                                 .getCardFormData();
 
+                                        /*
+                                         * O SDK JS do Mercado Pago coleta
+                                         * o Device ID automaticamente.
+                                         *
+                                         * Enviamos esse identificador ao
+                                         * backend para melhorar a análise
+                                         * antifraude.
+                                         */
+                                        const deviceId =
+                                            window
+                                                .MP_DEVICE_SESSION_ID;
+
                                         const cardTokenId =
                                             dados.token;
 
@@ -407,7 +420,9 @@ export default function Planos() {
 
                                                         installments,
 
-                                                        issuerId
+                                                        issuerId,
+
+                                                        deviceId
                                                     },
 
                                                     {
@@ -454,7 +469,9 @@ export default function Planos() {
                                                             .plano
                                                             .id,
 
-                                                    cardTokenId
+                                                    cardTokenId,
+
+                                                    deviceId
                                                 },
 
                                                 {

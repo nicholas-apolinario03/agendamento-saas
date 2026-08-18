@@ -4,21 +4,15 @@ import { randomUUID } from "crypto";
 const mercadoPagoApi = axios.create({
     baseURL: "https://api.mercadopago.com",
     headers: {
-        Authorization: `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
+        Authorization:
+            `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+        "Content-Type":
+            "application/json"
     }
 });
 
-
 /*
  * API separada para cobranças avulsas do upgrade.
- *
- * Em teste:
- * MERCADO_PAGO_PAYMENT_ACCESS_TOKEN = Access Token da área
- * "Credenciais de teste" da aplicação.
- *
- * Em produção:
- * use um Access Token produtivo com escopo "payment".
  */
 const mercadoPagoPaymentApi = axios.create({
     baseURL: "https://api.mercadopago.com",
@@ -28,7 +22,8 @@ const mercadoPagoPaymentApi = axios.create({
                 process.env.MERCADO_PAGO_PAYMENT_ACCESS_TOKEN ||
                 process.env.MERCADO_PAGO_ACCESS_TOKEN
             }`,
-        "Content-Type": "application/json"
+        "Content-Type":
+            "application/json"
     }
 });
 
@@ -47,24 +42,34 @@ export async function criarPlanoMercadoPago({
     preco,
     referencia
 }: CriarPlanoMercadoPago) {
-    const resposta = await mercadoPagoApi.post(
-        "/preapproval_plan",
-        {
-            reason: nome,
+    const resposta =
+        await mercadoPagoApi.post(
+            "/preapproval_plan",
+            {
+                reason:
+                    nome,
 
-            external_reference: referencia,
+                external_reference:
+                    referencia,
 
-            auto_recurring: {
-                frequency: 1,
-                frequency_type: "months",
-                transaction_amount: preco,
-                currency_id: "BRL"
-            },
+                auto_recurring: {
+                    frequency:
+                        1,
 
-            back_url:
-                `${process.env.FRONTEND_URL}/dashboard`
-        }
-    );
+                    frequency_type:
+                        "months",
+
+                    transaction_amount:
+                        preco,
+
+                    currency_id:
+                        "BRL"
+                },
+
+                back_url:
+                    `${process.env.FRONTEND_URL}/dashboard`
+            }
+        );
 
     return resposta.data;
 }
@@ -72,9 +77,10 @@ export async function criarPlanoMercadoPago({
 export async function buscarPlanoMercadoPago(
     mercadoPagoPlanoId: string
 ) {
-    const resposta = await mercadoPagoApi.get(
-        `/preapproval_plan/${mercadoPagoPlanoId}`
-    );
+    const resposta =
+        await mercadoPagoApi.get(
+            `/preapproval_plan/${mercadoPagoPlanoId}`
+        );
 
     return resposta.data;
 }
@@ -89,6 +95,7 @@ type CriarAssinaturaMercadoPago = {
     empresaId: number;
     planoId: number;
     email: string;
+    deviceId?: string;
 };
 
 /**
@@ -96,41 +103,53 @@ type CriarAssinaturaMercadoPago = {
  *
  * Os dados reais do cartão NÃO chegam neste serviço.
  * O frontend usa MercadoPago.js e envia somente o CardToken.
+ *
+ * O Device ID é enviado no header X-meli-session-id
+ * para enriquecer a análise antifraude do Mercado Pago.
  */
 export async function criarAssinaturaMercadoPago({
     planoMercadoPagoId,
     cardTokenId,
     empresaId,
     planoId,
-    email
+    email,
+    deviceId
 }: CriarAssinaturaMercadoPago) {
-    const resposta = await mercadoPagoApi.post(
-        "/preapproval",
-        {
-            preapproval_plan_id:
-                planoMercadoPagoId,
+    const resposta =
+        await mercadoPagoApi.post(
+            "/preapproval",
 
-            payer_email:
-                email,
+            {
+                preapproval_plan_id:
+                    planoMercadoPagoId,
 
-            card_token_id:
-                cardTokenId,
+                payer_email:
+                    email,
 
-            external_reference:
-                `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
+                card_token_id:
+                    cardTokenId,
 
-            back_url:
-                `${process.env.FRONTEND_URL}/dashboard`,
+                external_reference:
+                    `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
 
-            /*
-             * Para assinatura associada a um plano,
-             * o Mercado Pago exige status authorized
-             * quando card_token_id é enviado.
-             */
-            status:
-                "authorized"
-        }
-    );
+                back_url:
+                    `${process.env.FRONTEND_URL}/dashboard`,
+
+                status:
+                    "authorized"
+            },
+
+            {
+                headers: {
+                    ...(deviceId
+                        ? {
+                            "X-meli-session-id":
+                                deviceId
+                        }
+                        : {})
+                }
+            }
+        );
 
     return resposta.data;
 }
@@ -138,88 +157,71 @@ export async function criarAssinaturaMercadoPago({
 export async function buscarAssinaturaMercadoPago(
     assinaturaId: string
 ) {
-    const resposta = await mercadoPagoApi.get(
-        `/preapproval/${assinaturaId}`
-    );
+    const resposta =
+        await mercadoPagoApi.get(
+            `/preapproval/${assinaturaId}`
+        );
 
     return resposta.data;
 }
-
 
 // ======================================================
 // FATURAS / COBRANÇAS RECORRENTES
 // ======================================================
 
-/**
- * Busca a fatura ("authorized payment") gerada pela assinatura.
- *
- * O webhook subscription_authorized_payment envia o ID dessa
- * fatura em data.id. Os detalhes ficam disponíveis em:
- *
- * GET /authorized_payments/{id}
- */
 export async function buscarFaturaMercadoPago(
     authorizedPaymentId: string
 ) {
-    const resposta = await mercadoPagoApi.get(
-        `/authorized_payments/${authorizedPaymentId}`
-    );
+    const resposta =
+        await mercadoPagoApi.get(
+            `/authorized_payments/${authorizedPaymentId}`
+        );
 
     return resposta.data;
 }
-
 
 // ======================================================
 // GERENCIAMENTO DA ASSINATURA
 // ======================================================
 
-/**
- * Altera o valor que será usado nas próximas cobranças
- * da assinatura existente.
- *
- * Não cria uma segunda assinatura.
- */
 export async function alterarValorAssinaturaMercadoPago(
     assinaturaId: string,
     novoValor: number
 ) {
-    const resposta = await mercadoPagoApi.put(
-        `/preapproval/${assinaturaId}`,
-        {
-            auto_recurring: {
-                transaction_amount: novoValor,
-                currency_id: "BRL"
+    const resposta =
+        await mercadoPagoApi.put(
+            `/preapproval/${assinaturaId}`,
+            {
+                auto_recurring: {
+                    transaction_amount:
+                        novoValor,
+
+                    currency_id:
+                        "BRL"
+                }
             }
-        }
-    );
+        );
 
     return resposta.data;
 }
 
-/**
- * Atualiza a referência usada para sincronizar a assinatura
- * do Mercado Pago com empresa/plano do Neweris.
- */
 export async function atualizarReferenciaAssinaturaMercadoPago(
     assinaturaId: string,
     empresaId: number,
     planoId: number
 ) {
-    const resposta = await mercadoPagoApi.put(
-        `/preapproval/${assinaturaId}`,
-        {
-            external_reference:
-                `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`
-        }
-    );
+    const resposta =
+        await mercadoPagoApi.put(
+            `/preapproval/${assinaturaId}`,
+            {
+                external_reference:
+                    `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`
+            }
+        );
 
     return resposta.data;
 }
 
-/**
- * Upgrade imediato:
- * altera o valor e a referência da MESMA assinatura.
- */
 export async function fazerUpgradeAssinaturaMercadoPago({
     assinaturaId,
     novoValor,
@@ -231,40 +233,40 @@ export async function fazerUpgradeAssinaturaMercadoPago({
     empresaId: number;
     planoId: number;
 }) {
-    const resposta = await mercadoPagoApi.put(
-        `/preapproval/${assinaturaId}`,
-        {
-            external_reference:
-                `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
+    const resposta =
+        await mercadoPagoApi.put(
+            `/preapproval/${assinaturaId}`,
+            {
+                external_reference:
+                    `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
 
-            auto_recurring: {
-                transaction_amount: novoValor,
-                currency_id: "BRL"
+                auto_recurring: {
+                    transaction_amount:
+                        novoValor,
+
+                    currency_id:
+                        "BRL"
+                }
             }
-        }
-    );
+        );
 
     return resposta.data;
 }
 
-/**
- * Cancela novas cobranças da assinatura.
- *
- * A documentação atual do Mercado Pago usa "canceled".
- */
 export async function cancelarAssinaturaMercadoPago(
     assinaturaId: string
 ) {
-    const resposta = await mercadoPagoApi.put(
-        `/preapproval/${assinaturaId}`,
-        {
-            status: "canceled"
-        }
-    );
+    const resposta =
+        await mercadoPagoApi.put(
+            `/preapproval/${assinaturaId}`,
+            {
+                status:
+                    "canceled"
+            }
+        );
 
     return resposta.data;
 }
-
 
 // ======================================================
 // COBRANÇA PROPORCIONAL DE UPGRADE
@@ -280,15 +282,9 @@ type CriarPagamentoUpgradeMercadoPago = {
     empresaId: number;
     planoAtualId: number;
     planoNovoId: number;
+    deviceId?: string;
 };
 
-/**
- * Faz uma cobrança avulsa referente SOMENTE à diferença
- * proporcional do upgrade.
- *
- * O cartão é tokenizado no frontend pelo MercadoPago.js.
- * Número do cartão, validade e CVV não chegam ao backend.
- */
 export async function criarPagamentoUpgradeMercadoPago({
     cardTokenId,
     valor,
@@ -298,14 +294,16 @@ export async function criarPagamentoUpgradeMercadoPago({
     email,
     empresaId,
     planoAtualId,
-    planoNovoId
+    planoNovoId,
+    deviceId
 }: CriarPagamentoUpgradeMercadoPago) {
     const payerEmail =
         process.env.MERCADO_PAGO_TEST_PAYER_EMAIL ||
         email;
 
     const body: any = {
-        transaction_amount: valor,
+        transaction_amount:
+            valor,
 
         token:
             cardTokenId,
@@ -326,11 +324,8 @@ export async function criarPagamentoUpgradeMercadoPago({
         external_reference:
             `NEWERIS_UPGRADE_EMPRESA_${empresaId}_DE_${planoAtualId}_PARA_${planoNovoId}`,
 
-        /*
-         * Para o upgrade precisamos de uma resposta final
-         * imediatamente: approved ou rejected.
-         */
-        binary_mode: true
+        binary_mode:
+            true
     };
 
     if (
@@ -345,11 +340,41 @@ export async function criarPagamentoUpgradeMercadoPago({
     const resposta =
         await mercadoPagoPaymentApi.post(
             "/v1/payments",
+
             body,
+
             {
                 headers: {
                     "X-Idempotency-Key":
-                        randomUUID()
+                        randomUUID(),
+
+                    ...(deviceId
+                        ? {
+                            "X-meli-session-id":
+                                deviceId
+                        }
+                        : {})
+                }
+            }
+        );
+
+    return resposta.data;
+}
+
+// ======================================================
+// BUSCAR COBRANÇAS DA ASSINATURA
+// ======================================================
+
+export async function buscarCobrancasAssinaturaMercadoPago(
+    assinaturaId: string
+) {
+    const resposta =
+        await mercadoPagoApi.get(
+            "/authorized_payments/search",
+            {
+                params: {
+                    preapproval_id:
+                        assinaturaId
                 }
             }
         );
