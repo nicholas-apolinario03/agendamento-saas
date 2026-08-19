@@ -184,6 +184,28 @@ export async function criarAssinaturaHospedadaMercadoPago({
     planoId,
     email
 }: CriarAssinaturaHospedadaMercadoPago) {
+       const payerEmail =
+        email?.trim();
+
+    if (!payerEmail) {
+        throw new Error(
+            "E-mail do pagador não informado"
+        );
+    }
+
+    console.log(
+    "Criando assinatura hospedada:",
+    {
+        empresaId,
+        planoId,
+        payerEmailRecebido: email,
+        possuiEmail:
+            typeof email === "string" &&
+            email.trim().length > 0,
+        nomePlano,
+        preco
+    }
+);
     const resposta =
         await mercadoPagoApi.post(
             "/preapproval",
