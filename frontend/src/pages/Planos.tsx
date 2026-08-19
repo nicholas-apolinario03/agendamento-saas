@@ -146,7 +146,16 @@ export default function Planos() {
     // ==================================================
 
     useEffect(() => {
-        if (!pagamentoPendente) {
+        /*
+         * Nova assinatura não usa mais CardForm.
+         * O formulário local fica somente para o
+         * pagamento proporcional do upgrade.
+         */
+        if (
+            !pagamentoPendente ||
+            pagamentoPendente.tipo !==
+                "UPGRADE"
+        ) {
             return;
         }
 
@@ -357,10 +366,7 @@ export default function Planos() {
                                         const deviceId =
                                             window
                                                 .MP_DEVICE_SESSION_ID;
-                                        console.log(
-                                            "MP_DEVICE_SESSION_ID:",
-                                            deviceId
-                                        );
+
                                         const cardTokenId =
                                             dados.token;
 
@@ -587,6 +593,54 @@ export default function Planos() {
     ]);
 
     // ==================================================
+    // CHECKOUT HOSPEDADO MERCADO PAGO
+    // ==================================================
+
+    async function abrirCheckoutHospedado(
+        plano: Plano,
+        token: string
+    ) {
+        const resposta =
+            await api.post(
+                "/assinatura/checkout",
+
+                {
+                    planoId:
+                        plano.id
+                },
+
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`
+                    }
+                }
+            );
+
+        const initPoint =
+            resposta.data
+                ?.initPoint;
+
+        if (
+            !initPoint ||
+            typeof initPoint !==
+                "string"
+        ) {
+            throw new Error(
+                "Mercado Pago não retornou o link do checkout."
+            );
+        }
+
+        /*
+         * A partir daqui o cartão e os meios de
+         * pagamento são tratados no ambiente do MP.
+         */
+        window.location.href =
+            initPoint;
+    }
+
+
+    // ==================================================
     // ESCOLHER PLANO
     // ==================================================
 
@@ -655,17 +709,12 @@ export default function Planos() {
                         );
 
                     if (ativarAgora) {
-                        setPagamentoPendente({
-                            tipo:
-                                "NOVA_ASSINATURA",
-
+                        await abrirCheckoutHospedado(
                             plano,
+                            token
+                        );
 
-                            valor:
-                                Number(
-                                    plano.preco
-                                )
-                        });
+                        return;
                     }
 
                     break;
@@ -728,18 +777,12 @@ export default function Planos() {
                 }
 
                 case "NOVA_ASSINATURA":
-                    setPagamentoPendente({
-                        tipo:
-                            "NOVA_ASSINATURA",
-
+                    await abrirCheckoutHospedado(
                         plano,
+                        token
+                    );
 
-                        valor:
-                            Number(
-                                plano.preco
-                            )
-                    });
-                    break;
+                    return;
 
                 default:
                     alert(

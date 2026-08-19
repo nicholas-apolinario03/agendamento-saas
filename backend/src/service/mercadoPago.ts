@@ -154,6 +154,80 @@ export async function criarAssinaturaMercadoPago({
     return resposta.data;
 }
 
+
+// ======================================================
+// ASSINATURA COM CHECKOUT HOSPEDADO
+// ======================================================
+
+type CriarAssinaturaHospedadaMercadoPago = {
+    nomePlano: string;
+    preco: number;
+    empresaId: number;
+    planoId: number;
+    email: string;
+};
+
+/**
+ * Cria uma assinatura SEM preapproval_plan_id e SEM CardToken.
+ *
+ * O Mercado Pago recebe a recorrência diretamente em
+ * auto_recurring e devolve um init_point para que o
+ * comprador finalize o pagamento no checkout hospedado.
+ *
+ * O external_reference continua identificando
+ * empresa + plano no Neweris.
+ */
+export async function criarAssinaturaHospedadaMercadoPago({
+    nomePlano,
+    preco,
+    empresaId,
+    planoId,
+    email
+}: CriarAssinaturaHospedadaMercadoPago) {
+    const resposta =
+        await mercadoPagoApi.post(
+            "/preapproval",
+            {
+                reason:
+                    `NewerisBook ${nomePlano}`,
+
+                payer_email:
+                    email,
+
+                external_reference:
+                    `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
+
+                back_url:
+                    `${process.env.FRONTEND_URL}/dashboard`,
+
+                auto_recurring: {
+                    frequency:
+                        1,
+
+                    frequency_type:
+                        "months",
+
+                    transaction_amount:
+                        preco,
+
+                    currency_id:
+                        "BRL"
+                },
+
+                /*
+                 * Sem meio de pagamento definido.
+                 * O comprador concluirá o pagamento
+                 * pelo init_point retornado pelo MP.
+                 */
+                status:
+                    "pending"
+            }
+        );
+
+    return resposta.data;
+}
+
+
 export async function buscarAssinaturaMercadoPago(
     assinaturaId: string
 ) {

@@ -23,9 +23,8 @@ import {
     atualizarReferenciaAssinaturaMercadoPago,
     buscarAssinaturaMercadoPago,
     buscarFaturaMercadoPago,
-    buscarPlanoMercadoPago,
     cancelarAssinaturaMercadoPago,
-    criarAssinaturaMercadoPago,
+    criarAssinaturaHospedadaMercadoPago,
     criarPlanoMercadoPago,
     fazerUpgradeAssinaturaMercadoPago,
     criarPagamentoUpgradeMercadoPago
@@ -1222,7 +1221,7 @@ empresaRoutes.post(
 );
 
 // ======================================================
-// CHECKOUT / CRIAÇÃO DA ASSINATURA
+// CHECKOUT HOSPEDADO / CRIAÇÃO DA ASSINATURA
 // ======================================================
 
 empresaRoutes.post(
@@ -1234,9 +1233,7 @@ empresaRoutes.post(
                 (req as any).usuario;
 
             const {
-                planoId,
-                cardTokenId,
-                deviceId
+                planoId
             } = req.body;
 
             if (
@@ -1244,17 +1241,8 @@ empresaRoutes.post(
                 typeof planoId !== "number"
             ) {
                 return res.status(400).json({
-                    erro: "Plano inválido"
-                });
-            }
-
-            if (
-                !cardTokenId ||
-                typeof cardTokenId !== "string"
-            ) {
-                return res.status(400).json({
                     erro:
-                        "Token do cartão não informado"
+                        "Plano inválido"
                 });
             }
 
@@ -1271,7 +1259,8 @@ empresaRoutes.post(
             const plano =
                 await prisma.plano.findUnique({
                     where: {
-                        id: planoId
+                        id:
+                            planoId
                     }
                 });
 
@@ -1282,15 +1271,6 @@ empresaRoutes.post(
                 return res.status(404).json({
                     erro:
                         "Plano não encontrado"
-                });
-            }
-
-            if (
-                !plano.mercadoPagoPlanoId
-            ) {
-                return res.status(400).json({
-                    erro:
-                        "Plano não configurado para pagamento"
                 });
             }
 
@@ -1310,32 +1290,32 @@ empresaRoutes.post(
             }
 
             /*
-             * SEGURANÇA CONTRA COBRANÇA DUPLA:
+             * Uma empresa que já possui ciclo pago ativo
+             * não deve criar outra assinatura recorrente.
              *
-             * Uma empresa que já possui assinatura ativa
-             * não deve criar uma nova preapproval para fazer
-             * upgrade. Isso poderia deixar duas assinaturas
-             * recorrentes ativas simultaneamente.
+             * Upgrade/downgrade continuam pelas rotas
+             * específicas já existentes.
              */
             if (
-                assinatura.status === "ATIVA"
+                assinatura.status ===
+                "ATIVA"
             ) {
                 return res.status(409).json({
                     erro:
-                        "Já existe uma assinatura ativa. O upgrade deve alterar a assinatura atual."
+                        "Já existe uma assinatura ativa. Use upgrade ou downgrade para trocar de plano."
                 });
             }
 
             /*
-             * Guarda a intenção local antes da chamada externa.
-             * O plano só vira planoId atual depois que o Mercado
-             * Pago confirmar a assinatura como authorized.
+             * Guarda a intenção local antes de criar
+             * a preapproval no Mercado Pago.
              */
             await prisma.assinatura.update({
                 where: {
                     empresaId:
                         usuario.empresaId
                 },
+
                 data: {
                     proximoPlanoId:
                         plano.id
@@ -1343,17 +1323,24 @@ empresaRoutes.post(
             });
 
             /*
-             * O backend recebe apenas o CardToken.
+             * NOVO FLUXO:
              *
-             * Número do cartão, validade e CVV são tratados
-             * pelo MercadoPago.js no navegador.
+             * Não enviamos CardToken e não usamos
+             * preapproval_plan_id.
+             *
+             * A recorrência é criada diretamente na
+             * preapproval e o Mercado Pago devolve
+             * init_point para o checkout hospedado.
              */
             const assinaturaMP =
-                await criarAssinaturaMercadoPago({
-                    planoMercadoPagoId:
-                        plano.mercadoPagoPlanoId,
+                await criarAssinaturaHospedadaMercadoPago({
+                    nomePlano:
+                        plano.nome,
 
-                    cardTokenId,
+                    preco:
+                        Number(
+                            plano.preco
+                        ),
 
                     empresaId:
                         usuario.empresaId,
@@ -1362,12 +1349,7 @@ empresaRoutes.post(
                         plano.id,
 
                     email:
-                        usuario.email,
-
-                    deviceId:
-                        typeof deviceId === "string"
-                            ? deviceId
-                            : undefined
+                        usuario.email
                 });
 
             if (!assinaturaMP?.id) {
@@ -1377,21 +1359,27 @@ empresaRoutes.post(
                 });
             }
 
+            if (!assinaturaMP?.init_point) {
+                return res.status(502).json({
+                    erro:
+                        "Mercado Pago não retornou o link do checkout"
+                });
+            }
+
             /*
-             * O checkout NÃO cria inicioCiclo/fimCiclo.
+             * Salvamos a assinatura individual ANTES
+             * de redirecionar o comprador.
              *
-             * O Mercado Pago é a fonte de verdade do ciclo:
-             * somente subscription_authorized_payment com
-             * payment.status = approved cria/renova o ciclo.
-             *
-             * Aqui salvamos apenas os identificadores da
-             * assinatura e a intenção do plano.
+             * Assim, quando os webhooks chegarem,
+             * já conseguimos relacionar a preapproval
+             * com a empresa correta.
              */
             await prisma.assinatura.update({
                 where: {
                     empresaId:
                         usuario.empresaId
                 },
+
                 data: {
                     proximoPlanoId:
                         plano.id,
@@ -1408,10 +1396,6 @@ empresaRoutes.post(
                             )
                             : null,
 
-                    /*
-                     * Nova assinatura: aguardamos a primeira
-                     * cobrança aprovada para iniciar o ciclo.
-                     */
                     inicioCiclo:
                         null,
 
@@ -1426,16 +1410,45 @@ empresaRoutes.post(
                 }
             });
 
+            console.log(
+                "Checkout hospedado Mercado Pago criado:",
+                {
+                    empresaId:
+                        usuario.empresaId,
+
+                    planoId:
+                        plano.id,
+
+                    assinaturaMercadoPagoId:
+                        assinaturaMP.id,
+
+                    status:
+                        assinaturaMP.status,
+
+                    externalReference:
+                        assinaturaMP.external_reference
+                }
+            );
+
             return res.status(201).json({
-                sucesso: true,
+                sucesso:
+                    true,
+
                 assinaturaMercadoPagoId:
-                    String(assinaturaMP.id),
+                    String(
+                        assinaturaMP.id
+                    ),
+
                 status:
-                    assinaturaMP.status
+                    assinaturaMP.status,
+
+                initPoint:
+                    assinaturaMP.init_point
             });
+
         } catch (erro: any) {
             console.error(
-                "Erro ao criar assinatura:",
+                "Erro ao criar checkout hospedado:",
                 erro.response?.data ||
                     erro.message ||
                     erro
@@ -1449,7 +1462,7 @@ empresaRoutes.post(
             ).json({
                 erro:
                     mensagemMercadoPago ||
-                    "Erro ao criar assinatura"
+                    "Erro ao criar checkout hospedado"
             });
         }
     }
@@ -2009,11 +2022,7 @@ empresaRoutes.post(
                             }
                         });
 
-                    if (
-                        !planoCiclo ||
-                        !planoCiclo
-                            .mercadoPagoPlanoId
-                    ) {
+                    if (!planoCiclo) {
                         console.error(
                             "Plano local não encontrado para cobrança:",
                             planoCicloId
@@ -2022,20 +2031,31 @@ empresaRoutes.post(
                         return res.sendStatus(200);
                     }
 
-                    const planoMP =
-                        await buscarPlanoMercadoPago(
-                            planoCiclo
-                                .mercadoPagoPlanoId
+                    /*
+                     * A frequência agora vem da própria
+                     * assinatura individual do Mercado Pago.
+                     *
+                     * Isso funciona tanto para as novas
+                     * assinaturas SEM preapproval_plan_id
+                     * quanto para assinaturas antigas.
+                     */
+                    const preapprovalMP =
+                        await buscarAssinaturaMercadoPago(
+                            String(
+                                preapprovalId
+                            )
                         );
 
                     const frequency =
                         Number(
-                            planoMP.auto_recurring
+                            preapprovalMP
+                                .auto_recurring
                                 ?.frequency
                         );
 
                     const frequencyType =
-                        planoMP.auto_recurring
+                        preapprovalMP
+                            .auto_recurring
                             ?.frequency_type;
 
                     if (
@@ -2043,7 +2063,7 @@ empresaRoutes.post(
                         !frequencyType
                     ) {
                         throw new Error(
-                            "Frequência do plano Mercado Pago não encontrada"
+                            "Frequência da assinatura Mercado Pago não encontrada"
                         );
                     }
 
