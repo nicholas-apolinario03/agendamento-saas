@@ -67,7 +67,7 @@ export async function criarPlanoMercadoPago({
                 },
 
                 back_url:
-                    `${process.env.FRONTEND_URL}/dashboard`
+                    `${process.env.URL_FRONTEND}/dashboard`
             }
         );
 
@@ -133,7 +133,7 @@ export async function criarAssinaturaMercadoPago({
                     `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
 
                 back_url:
-                    `${process.env.FRONTEND_URL}/dashboard`,
+                    `${process.env.URL_FRONTEND}/dashboard`,
 
                 status:
                     "authorized"
@@ -198,7 +198,7 @@ export async function criarAssinaturaHospedadaMercadoPago({
                     `NEWERIS_EMPRESA_${empresaId}_PLANO_${planoId}`,
 
                 back_url:
-                    `${process.env.FRONTEND_URL}/dashboard`,
+                    `${process.env.URL_FRONTEND}/dashboard`,
 
                 auto_recurring: {
                     frequency:
